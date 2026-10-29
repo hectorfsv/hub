@@ -227,7 +227,9 @@ body.dim .talk{opacity:0}
 #sheet .err{color:#FF8A80;min-height:20px}
 #toast{position:fixed;left:50%;top:18px;z-index:70;transform:translate(-50%,-220%);opacity:0;padding:11px 18px;border-radius:6px;background:rgba(20,13,9,.96);border:1px solid rgba(255,181,71,.5);font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--gold-hot);white-space:nowrap;transition:transform .35s cubic-bezier(.2,.9,.3,1),opacity .25s;pointer-events:none}
 #toast.on{transform:translate(-50%,0);opacity:1}
-@media (prefers-reduced-motion:reduce){.spin,.halo,.pulse,.pod .orb,.pod .glow{animation:none!important}}
+/* a browser asking for less motion gets a still reactor. Not the tablet's app: its "reduce motion" is only Android's
+   own animations switched off for speed (10-28), and the HUB's motion is the point (Hector: "make it look the best possible") */
+@media (prefers-reduced-motion:reduce){body:not(.app) .spin,body:not(.app) .halo,body:not(.app) .pulse,body:not(.app) .pod .orb,body:not(.app) .pod .glow{animation:none!important}}
 </style>
 </head>
 <body class="boot">
