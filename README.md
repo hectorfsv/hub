@@ -70,10 +70,18 @@ revert the commit "Put the add-ons on".
 - **`sw.js` keeps an offline copy** of the page and its fonts, so it opens before the Wi-Fi is back. The page comes from the
   network whenever the network answers within 4 s.
 
+## On a TV (the Fire TV Stick, 2026-10-29)
+
+Hubs 2.1 says `tv: true` in its services and hands the stick's arrows and Select to the page as ArrowLeft/Right/Up/Down
+and Enter. The page then moves a gold ring (`.cur`) by direction over the pods, LINK LIVE COOKS, the clock and the gear;
+inside a sheet, over that sheet's buttons and fields. Select presses; on the clock it opens the kitchen timer (the hold);
+Back closes a sheet (the app sends Escape) and the ring returns to where it was. The page lays out at 1443x812 there
+(the app's wide viewport). A finger never sees the ring; a keyboard's focus wears the same one.
+
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 162 checks:
+It has 202 checks (the TV view and the remote since 10-29):
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;
