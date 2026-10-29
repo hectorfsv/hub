@@ -178,7 +178,7 @@ try {
     await page.click('#sh-go'); await page.waitForTimeout(800);
     const ses = await page.evaluate(() => JSON.parse(localStorage.getItem('hub.pit')));
     ok(ses && ses.access_token === 'a1' && !(await page.evaluate(() => localStorage.getItem('pit.session'))), "the HUB keeps its own session ('hub.pit'), never the Pit page's");
-    ok((await state(page)).pit === 'idle' && /IDLE/.test(await page.textContent('#st1')), 'no cook running: the Pit pod says IDLE');
+    ok((await state(page)).pit === 'idle' && /ON · PIT 251°/.test(await page.textContent('#st1')), 'no cook, a fresh reading: the Pit pod shows the smoker on at 251°');
     pit.cooks = COOK; await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
     ok((await state(page)).forge, 'a cook starts: the forge lights');
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));

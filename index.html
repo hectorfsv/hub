@@ -478,7 +478,7 @@ function renderPods() {
       if (c.stale) a = `<em class="bad">NO SIGNAL · ${c.staleMin} MIN</em>`;
       else a = `<em class="hot">${c.phaseLabel}</em> · PIT ${deg(c.pit)}`;
       if (c.meat) b = `${esc(c.meat.name.toUpperCase())} ${deg(c.meat.t)}${c.meat.target ? ' → ' + c.meat.target + '°' : ''}`;
-    } else if (i === S.pitIx && S.pit === 'idle') a = '<em class="ok">●</em> IDLE';
+    } else if (i === S.pitIx && S.pit === 'idle') a = !S.idle ? '<em class="ok">●</em> IDLE' : S.idle.power === false ? '<em>○</em> SMOKER OFF' : `<em class="ok">●</em> ON · PIT ${deg(S.idle.pit)}`;
     else a = S.reach[i] === 'on' ? '<em class="ok">●</em> ONLINE' : '<em>○</em> CHECKING';
     if (i === S.pitIx && s.url && S.pit === 'unlinked') b = '';
     st.innerHTML = a;
@@ -662,7 +662,11 @@ async function pitPoll() {
     else if (!pitSession()) { S.pit = 'unlinked'; S.cook = null; }
     else try {
       const rows = await pitGet('cooks?status=in.(running,paused)&order=started_at.desc&limit=1&select=id,meat,status,state,started_at');
-      if (!rows.length) { S.cook = null; S.pit = 'idle'; }
+      if (!rows.length) {
+        S.cook = null; S.pit = 'idle';
+        const last = await pitGet('readings?order=at.desc&limit=1&select=at,pit,power');
+        S.idle = last[0] && Date.now() - new Date(last[0].at).getTime() < 10 * MIN ? last[0] : null;
+      }
       else {
         const rd = await pitGet(`readings?cook_id=eq.${rows[0].id}&order=at.desc&limit=1&select=at,pit,setpoint,probes`);
         S.cook = shapeCook(rows[0], rd[0]); S.pit = 'cook';
@@ -833,6 +837,7 @@ press($('clock'), () => {
   launch(S.talkIx, 'talk', { x: S.geo.cx, y: S.geo.cy });
 });
 $('gear').addEventListener('click', () => { if (APP) APP.panel(); });
+doc.addEventListener('keydown', e => { if (e.key === 'Escape' && S.sheet) closeSheet(); });
 
 // ---- samples (?demo=cook, ?demo=night): never real data ----
 function demoCook() {
