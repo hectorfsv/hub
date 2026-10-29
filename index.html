@@ -53,10 +53,9 @@ body.forge #forge{opacity:1}
 #embers,#motes{position:absolute;inset:0;overflow:hidden}
 #motes{position:fixed;pointer-events:none;z-index:2}
 .pt{position:absolute;bottom:-14px;border-radius:50%;will-change:transform,opacity}
-.pt>b{display:block;width:100%;height:100%;border-radius:50%;will-change:transform}
-.ember>b{background:radial-gradient(circle,#FFF6DA 0%,#FFC46B 20%,rgba(255,106,26,.85) 42%,rgba(255,80,20,0) 70%)}
-.ember.red>b{background:radial-gradient(circle,#FFE0B0 0%,#FF8A3A 22%,rgba(230,50,10,.8) 44%,rgba(200,30,0,0) 70%)}
-.mote>b{background:radial-gradient(circle,rgba(255,233,176,.9) 0%,rgba(255,181,71,.45) 35%,rgba(255,181,71,0) 70%)}
+.ember{background:radial-gradient(circle,#FFF6DA 0%,#FFC46B 20%,rgba(255,106,26,.85) 42%,rgba(255,80,20,0) 70%)}
+.ember.red{background:radial-gradient(circle,#FFE0B0 0%,#FF8A3A 22%,rgba(230,50,10,.8) 44%,rgba(200,30,0,0) 70%)}
+.mote{background:radial-gradient(circle,rgba(255,233,176,.9) 0%,rgba(255,181,71,.45) 35%,rgba(255,181,71,0) 70%)}
 #scan{position:fixed;left:0;right:0;top:0;height:60px;margin-top:-30px;pointer-events:none;z-index:2;opacity:0;will-change:transform,opacity;
   background:linear-gradient(180deg,transparent,rgba(255,181,71,.035) 45%,rgba(255,233,176,.16) 50%,rgba(255,181,71,.035) 55%,transparent)}
 
@@ -731,18 +730,23 @@ function forge(on) {
   if (!on) { setTimeout(() => { if (!body.classList.contains('forge')) box.innerHTML = ''; }, 2600); renderWx(); return; }
   box.innerHTML = '';
   const W = innerWidth, H = innerHeight, pitX = S.geo && S.pitIx >= 0 ? S.geo.pods[S.pitIx].x : W / 2;
-  for (let k = 0; k < 30; k++) {
+  for (let k = 0; k < 28; k++) {
     const size = rnd(5, 15), near = Math.random() < .55, x = near ? pitX + rnd(-W * .22, W * .22) : rnd(0, W);
     const o = doc.createElement('i'); o.className = 'pt ember' + (Math.random() < .3 ? ' red' : '');
     Object.assign(o.style, { left: clamp(x, 4, W - 4) + 'px', width: size + 'px', height: size + 'px' });
-    const b = doc.createElement('b'); o.appendChild(b); box.appendChild(o);
-    const dur = rnd(5200, 11000), rise = H * rnd(.42, .86), drift = rnd(-60, 60);
-    o.animate([{ transform: 'translate3d(0,0,0)', opacity: 0 }, { opacity: rnd(.75, 1), offset: .07 }, { opacity: rnd(.55, .9), offset: .55 }, { transform: `translate3d(${drift}px,${-rise}px,0)`, opacity: 0 }],
-      { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: 'cubic-bezier(.25,.55,.55,1)' });
-    b.animate([{ transform: `translateX(${rnd(-14, -5)}px) scale(${rnd(.7, 1)})` }, { transform: `translateX(${rnd(5, 14)}px) scale(${rnd(.8, 1.15)})` }],
-      { duration: rnd(1300, 2600), iterations: Infinity, direction: 'alternate', easing: 'ease-in-out', delay: -rnd(0, 2600) });
+    box.appendChild(o);
+    o.animate(rising(H * rnd(.42, .86), rnd(-60, 60), rnd(6, 16), rnd(2, 4), [rnd(.75, 1), rnd(.55, .9)]),
+      { duration: rnd(5200, 11000), iterations: Infinity, delay: -rnd(0, 11000), easing: 'cubic-bezier(.25,.55,.55,1)' });
   }
   renderWx();
+}
+// a spark's path in one animation (one layer each): up by rise, across by drift, swaying `waves` times
+function rising(rise, drift, sway, waves, [peak, mid], inAt = .07, midAt = .55) {
+  const f = [0, .125, .25, .375, .5, .625, .75, .875, 1].map(t => ({ offset: t,
+    transform: `translate3d(${(drift * t + Math.sin(t * Math.PI * 2 * waves) * sway).toFixed(1)}px,${(-rise * t).toFixed(1)}px,0)` }));
+  f[0].opacity = 0; f[f.length - 1].opacity = 0;
+  f.push({ offset: inAt, opacity: peak }, { offset: midAt, opacity: mid });
+  return f.sort((a, b) => a.offset - b.offset);
 }
 // gold dust, always: slow, sparse
 function motes() {
@@ -751,11 +755,9 @@ function motes() {
   for (let k = 0; k < 14; k++) {
     const size = rnd(4, 8), o = doc.createElement('i'); o.className = 'pt mote';
     Object.assign(o.style, { left: rnd(8, W - 8) + 'px', width: size + 'px', height: size + 'px' });
-    const b = doc.createElement('b'); o.appendChild(b); box.appendChild(o);
+    box.appendChild(o);
     const dur = rnd(26000, 46000), peak = rnd(.25, .6);
-    o.animate([{ transform: 'translate3d(0,0,0)', opacity: 0 }, { opacity: peak, offset: .2 }, { opacity: peak * .7, offset: .75 }, { transform: `translate3d(${rnd(-40, 40)}px,${-H * rnd(.6, 1.05)}px,0)`, opacity: 0 }],
-      { duration: dur, iterations: Infinity, delay: -rnd(0, dur) });
-    b.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }], { duration: rnd(3000, 6000), iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    o.animate(rising(H * rnd(.6, 1.05), rnd(-40, 40), 6, rnd(3, 6), [peak, peak * .7], .2, .75), { duration: dur, iterations: Infinity, delay: -rnd(0, dur) });
   }
   const sc = $('scan');
   sc.animate([{ transform: 'translateY(0)', opacity: 0 }, { opacity: 1, offset: .05 }, { transform: `translateY(${H}px)`, opacity: .8, offset: .62 }, { transform: `translateY(${H}px)`, opacity: 0, offset: .66 }, { transform: `translateY(${H}px)`, opacity: 0 }],

@@ -137,7 +137,7 @@ try {
     ok(/BRISKET/.test(await page.textContent('#ck-name')), 'the cook card names the cook');
     ok(/251°/.test(await page.textContent('#st1')) && /168°/.test(await page.textContent('#st2_1')), 'the Pit pod shows pit 251° and brisket 168°');
     ok(await page.$eval('.pod.pit', p => p.classList.contains('hot')), 'the Pit pod burns');
-    ok(await page.$$eval('#embers .ember', e => e.length) === 30, '30 embers');
+    ok(await page.$$eval('#embers .ember', e => e.length) === 28, '28 embers');
     ok(await page.isVisible('#gear'), 'the gear shows in the app');
     checkLayout(await page.evaluate(geometry), view + ' forge');
     await shot(page, `${view}-forge`);
