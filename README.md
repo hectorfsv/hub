@@ -61,6 +61,9 @@ revert the commit "Put the add-ons on".
 
 - **Everything that moves is a `transform` or an `opacity`** on a layer painted once. The tablet's chip only composites;
   nothing repaints per frame and no script runs per frame.
+- **Nothing new gets a layer of its own at rest.** The tablet's GPU blends every composited layer every frame, even a still
+  one. Each add-on as its own layer cost ~25 late frames in 500 (measured 10-29). Draw new things into a layer that already
+  exists: the static outer ring, or the core. The suite checks it.
 - **Nothing runs while it is hidden** (a service on screen): no polling, and every animation stops.
 - **`sw.js` keeps an offline copy** of the page and its fonts, so it opens before the Wi-Fi is back. The page comes from the
   network whenever the network answers within 4 s.
