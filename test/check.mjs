@@ -184,6 +184,7 @@ try {
     ok(/^\d{2}:\d{2}$/.test(await page.textContent('#time')), 'the clock reads HH:MM (24-hour, his setting)');
     ok(await page.isVisible('#chip1'), "the Pit offers 'LINK LIVE COOKS'");
     ok(st.reach[0] === 'on' && st.reach[1] === 'on' && st.reach[2] === 'unset', 'each service checked (Home not set up)');
+    ok(!!(await page.$('#gauges path')) && st.air === 70 && !!st.bead, 'the add-ons are on by default: the brackets, the air, the bead');
     checkLayout(await page.evaluate(geometry), view);
     await shot(page, `${view}-browser`);
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
@@ -267,24 +268,10 @@ try {
     await ctx.close();
   }
 
-  // 6. the add-ons wait behind ?try=1: without it, the page the tablet runs draws, reads and listens to nothing new
-  {
-    console.log('\ntablet: app, no ?try (what the tablet runs today)');
-    const { ctx, page, errors, hits } = await open('tablet', { app: true, query: 'boot=0', battery: { level: .87, charging: true } });
-    await page.waitForTimeout(1500);
-    ok(!(await page.$('#gauges, #dayring, #tmr, .flare, #chg')), 'none of the add-ons is drawn');
-    ok(hits.air === 0 && (await page.evaluate(() => window.__batCalls)) === 0, 'no air-quality request, no battery read');
-    await hold(page, '#clock');
-    ok(await page.isHidden('#sheet') && !(await page.evaluate(() => document.body.dataset.hol)), 'holding the clock opens nothing; no holiday colors');
-    ok((await page.textContent('#greet')) === 'GOOD EVENING, HECTOR', 'the usual greeting');
-    ok(!errors.length, errs(errors));
-    await ctx.close();
-  }
-
-  // 7. ?try=1 by day: power and air beside the clock, the sun on its ring, at every size
+  // 6. by day: power and air beside the clock, the sun on its ring, at every size
   for (const view of Object.keys(VIEWS)) {
-    console.log(`\n${view}: ?try=1, 10:30, battery 87% charging, AQI 70`);
-    const { ctx, page, errors, hits } = await open(view, { app: view.startsWith('tablet'), query: 'boot=0&try=1', at: '2026-10-28T10:30:00-07:00', battery: { level: .87, charging: true } });
+    console.log(`\n${view}: 10:30, battery 87% charging, AQI 70`);
+    const { ctx, page, errors, hits } = await open(view, { app: view.startsWith('tablet'), query: 'boot=0', at: '2026-10-28T10:30:00-07:00', battery: { level: .87, charging: true } });
     await page.waitForTimeout(1500);
     const st = await state(page), cells = await lit(page);
     ok(hits.air === 1 && st.air === 70, 'the air read once: AQI 70');
@@ -300,10 +287,10 @@ try {
     await ctx.close();
   }
 
-  // 8. the hour flare, then the kitchen timer from the hold to the alarm
+  // 7. the hour flare, then the kitchen timer from the hold to the alarm
   {
-    console.log('\ntablet: ?try=1, the hour flare and the kitchen timer');
-    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1', at: '2026-10-28T10:59:40-07:00', battery: { level: 1, charging: true } });
+    console.log('\ntablet: the hour flare and the kitchen timer');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0', at: '2026-10-28T10:59:40-07:00', battery: { level: 1, charging: true } });
     await page.waitForTimeout(1200);
     await page.clock.pauseAt(new Date('2026-10-28T10:59:50-07:00'));
     ok((await state(page)).flares === 0, 'no flare before the hour');
@@ -350,10 +337,10 @@ try {
     await ctx.close();
   }
 
-  // 9. night: the moon in its phase on the bottom half; no flare while the screen is dimmed
+  // 8. night: the moon in its phase on the bottom half; no flare while the screen is dimmed
   {
-    console.log('\ntablet: ?try=1 at night');
-    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1', at: '2026-10-28T21:58:30-07:00', battery: { level: 1, charging: true } });
+    console.log('\ntablet: night, the moon');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0', at: '2026-10-28T21:58:30-07:00', battery: { level: 1, charging: true } });
     await page.waitForTimeout(1000);
     await page.clock.pauseAt(new Date('2026-10-28T21:58:40-07:00'));
     let st = await state(page);
@@ -368,10 +355,10 @@ try {
     await ctx.close();
   }
 
-  // 10. holidays (by date and on screen), and the battery running low, then plugged in
+  // 9. holidays (by date and on screen), and the battery running low, then plugged in
   {
-    console.log("\ntablet-land: ?try=1 on New Year's Eve, the battery at 8%");
-    const { ctx, page, errors } = await open('tablet-land', { app: true, query: 'boot=0&try=1', at: '2026-12-31T10:00:00-08:00', battery: { level: .08, charging: false } });
+    console.log("\ntablet-land: New Year's Eve, the battery at 8%");
+    const { ctx, page, errors } = await open('tablet-land', { app: true, query: 'boot=0', at: '2026-12-31T10:00:00-08:00', battery: { level: .08, charging: false } });
     await page.waitForTimeout(1500);
     const days = await page.evaluate(() => ['2026-10-31T12:00', '2026-10-28T12:00', '2026-11-26T12:00', '2026-11-19T12:00', '2026-12-24T12:00', '2026-12-25T12:00', '2026-12-31T12:00', '2027-01-01T12:00', '2027-07-04T12:00', '2027-11-25T12:00'].map(window.hub.holiday));
     ok(days.join() === 'halloween,,thanksgiving,,xmas,xmas,newyear,newyear,july4,thanksgiving', 'holidays by date: ' + days.join());
@@ -389,8 +376,8 @@ try {
     await ctx.close();
   }
   {
-    console.log('\ntablet: ?try=1&holiday=halloween, evening');
-    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1&holiday=halloween', at: '2026-10-28T19:30:00-07:00', battery: { level: 1, charging: true } });
+    console.log('\ntablet: ?holiday=halloween, evening');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&holiday=halloween', at: '2026-10-28T19:30:00-07:00', battery: { level: 1, charging: true } });
     await page.waitForTimeout(2500);
     ok((await page.textContent('#greet')) === 'HAPPY HALLOWEEN, HECTOR' && (await page.$eval('#greet', e => getComputedStyle(e).color)) === 'rgb(196, 140, 255)', 'Halloween: HAPPY HALLOWEEN, HECTOR, in purple');
     const motes = await page.$$eval('.mote', ms => ms.map(m => m.getAnimations()[0].effect.getKeyframes().reduce((a, k) => Math.max(a, k.opacity == null ? 0 : +k.opacity), 0)));

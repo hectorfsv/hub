@@ -10,7 +10,8 @@
 <!--
   The HUB: the desk tablet's front door (Hector 2026-10-28: "a HUB first with a nice background and a badass view").
   ARC with the Forge: the Lounge's gold reactor holds the clock; the Lounge, the Pit and Home sit on its orbit; while a
-  cook runs, embers rise and the bottom glows like a firebox. Inside the Hubs app (window.HubsApp) a pod opens that
+  cook runs, embers rise and the bottom glows like a firebox. Around the clock (his picks 10-28): power and air, the day
+  orbit (sun, then moon), the hour flare, the kitchen timer (hold the clock), holiday colors. Inside the Hubs app (window.HubsApp) a pod opens that
   service; in any browser the pods are plain links. (The core's talk is out for now, his word 10-28: this tablet is too
   old; it comes back with a better one: hub commit d86b702.)
   Every moving thing is a transform or an opacity on a layer painted once: the tablet's chip only composites
@@ -93,7 +94,7 @@ body.forge .sweep.hot{opacity:1}body.forge .sweep.cool{opacity:0}
   color:#FFE2A0;text-shadow:0 0 calc(var(--R)*.07) rgba(255,181,71,.55),0 0 calc(var(--R)*.2) rgba(255,140,40,.25)}
 .date{font-family:var(--disp);font-weight:600;font-size:calc(var(--R)*.074);letter-spacing:.26em;color:var(--gold);opacity:.88;margin-top:calc(var(--R)*.07);padding-left:.26em;white-space:nowrap}
 
-/* ---- the add-ons, his picks 10-28 (?try=1 until he says "put it on"): power and air beside the clock, the day orbit,
+/* ---- the add-ons, his picks 10-28 (on since his "put it on" that night): power and air beside the clock, the day orbit,
         the hour flare, the kitchen timer, holiday colors. Drawn once; a number changing redraws only its own layer ---- */
 .flare{inset:-14%!important;width:auto!important;height:auto!important;border-radius:50%;opacity:0;visibility:hidden;will-change:transform,opacity;pointer-events:none;
   background:radial-gradient(circle,rgba(255,241,204,.5) 0%,rgba(255,181,71,.3) 26%,rgba(255,140,40,.1) 48%,transparent 68%)}
@@ -127,7 +128,6 @@ body[data-hol=thanksgiving]{--h1:226,72,61;--h2:255,154,46;--h3:201,133,46;--hg:
 body[data-hol=xmas]{--h1:255,74,74;--h2:63,208,122;--h3:255,255,255;--hg:255,96,96}
 body[data-hol=newyear]{--h1:255,233,176;--h2:217,222,232;--h3:255,255,255;--hg:236,240,248}
 body[data-hol=july4]{--h1:255,74,74;--h2:255,255,255;--h3:91,140,255;--hg:130,165,255}
-body.try #foot{gap:14px}
 
 /* ---- the orbit ---- */
 #orbit{position:absolute;z-index:3;pointer-events:none}
@@ -205,7 +205,7 @@ body.forge #cook{display:block}body.forge #hours{display:none}
 .ck2 em u{text-decoration:none;font-size:18px;color:var(--dim)}
 .bar{height:4px;margin-top:9px;border-radius:2px;background:rgba(255,181,71,.13);overflow:hidden}
 .bar i{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#B83A08,var(--ember),#FFD27A);transition:width 1.2s ease}
-#foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--faint)}
+#foot{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--faint)}
 #net::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--go);margin-right:8px;vertical-align:1px;box-shadow:0 0 6px var(--go)}
 #net.off::before{background:var(--red);box-shadow:0 0 6px var(--red)}
 #gear{display:none;width:36px;height:36px;margin:-12px -8px -12px 0;border:0;background:none;color:var(--dim);cursor:pointer}
@@ -299,7 +299,6 @@ body.dim #scan,body.dim #motes{display:none}
 const APP = window.HubsApp || null;          // the Hubs app on the desk tablet; absent in a browser
 const Q = new URLSearchParams(location.search);
 const DEMO = Q.get('demo') || '';
-const TRY = Q.has('try');                    // the add-ons (his picks 10-28): only with ?try=1 until he says "put it on"
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const MIN = 60e3;
 const PLACE = { lat: 34.3917, lon: -118.5426, name: 'SANTA CLARITA' };   // the point the Lounge's weather uses
@@ -569,12 +568,12 @@ function tick() {
   const d = new Date();
   $('time').textContent = hm(d);
   $('date').textContent = `${DAYS[d.getDay()]} · ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const h = d.getHours(), hol = TRY ? holiday(d) : '';
-  if (TRY && hol !== (body.dataset.hol || '')) { if (hol) body.dataset.hol = hol; else delete body.dataset.hol; if (S.booted) motes(); }
+  const h = d.getHours(), hol = holiday(d);
+  if (hol !== (body.dataset.hol || '')) { if (hol) body.dataset.hol = hol; else delete body.dataset.hol; if (S.booted) motes(); }
   $('greet').textContent = (hol ? HELLO[hol](d) : h < 5 ? 'LATE NIGHT' : h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING') + ', HECTOR';
   const sec = $('sec'); sec.style.animationDelay = -(d.getSeconds() + d.getMilliseconds() / 1000) + 's';
   renderSun(); if (S.cook) renderCook();
-  if (TRY && S.booted) {
+  if (S.booted) {
     if (d.getMinutes() === 0 && d.getSeconds() < 5 && !S.dimmed && !doc.hidden && S.flared !== d.toDateString() + h) { S.flared = d.toDateString() + h; hourFlare(); }
     if (!doc.hidden) { weather(false); air(false); }   // a HUB left on screen for hours keeps its weather fresh (every 15 min)
   }
@@ -891,12 +890,11 @@ function demoWx() {
     daily: { weather_code: [1, 2], temperature_2m_max: [76, 74], temperature_2m_min: [51, 50], sunrise: [iso(new Date(day.getTime() + 7.1 * 3600e3)), iso(new Date(day.getTime() + 31.1 * 3600e3))], sunset: [iso(new Date(day.getTime() + 18.1 * 3600e3)), iso(new Date(day.getTime() + 42.1 * 3600e3))] } };
 }
 
-// ---- the add-ons, his picks 10-28 (?try=1 until he says "put it on"): power and air beside the clock, the day orbit,
+// ---- the add-ons, his picks 10-28 (on since his "put it on" that night): power and air beside the clock, the day orbit,
 //      the hour flare, the kitchen timer, holiday colors. Each is drawn once and redrawn only when its number changes;
 //      the bead turns once a minute; the flare and the charging spark are one-shots ----
 function addOns() {
   const r = $('reactor');
-  body.classList.add('try');
   r.querySelector('.halo.hot').insertAdjacentHTML('afterend', '<div class="flare" aria-hidden="true"></div>');
   r.querySelector('.r-sweep').insertAdjacentHTML('afterend', '<div id="dayring" aria-hidden="true"><div id="bead"></div></div>');
   $('sec').insertAdjacentHTML('afterend', '<svg viewBox="-100 -100 200 200" id="gauges" aria-hidden="true"></svg>'
@@ -1121,18 +1119,18 @@ window.hub = {
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
   state() {
     const o = { booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() };
-    if (TRY) Object.assign(o, { bat: S.bat, air: S.air ? S.air.aqi : null, day: dayPos(Date.now()), bead: $('bead').dataset.kind || '', tmr: S.tmr, alarm: !!S.alarm, flares: S.flares || 0, sparks: S.sparks || 0, hol: body.dataset.hol || '' });
+    Object.assign(o, { bat: S.bat, air: S.air ? S.air.aqi : null, day: dayPos(Date.now()), bead: $('bead').dataset.kind || '', tmr: S.tmr, alarm: !!S.alarm, flares: S.flares || 0, sparks: S.sparks || 0, hol: body.dataset.hol || '' });
     return JSON.stringify(o);
   },
   demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
 
-if (TRY) Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare });
+Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare });
 
 // ---- start ----
 if (APP) body.classList.add('app');
 loadServices(); drawRings(); buildPods(); layout(true);
-if (TRY) addOns();
+addOns();
 S.wx = store.get('hub.wx'); renderWx(); tick(); motes();
 setInterval(idleTick, 5000);
 S.checkedAt = Date.now();

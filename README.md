@@ -2,8 +2,9 @@
 
 The desk tablet's front door: **https://hectorfsv.github.io/hub/**
 
-ARC with the Forge. A gold reactor holds the clock (24-hour) and the date. The core's talk is out for now, until a better
-tablet. The Lounge, the Pit and Home sit on its orbit. While a cook runs on
+ARC with the Forge. A gold reactor holds the clock (24-hour) and the date, with power and air beside it and the sun or the
+moon on its ring. The core's talk is out for now, until a better tablet; hold the clock for the kitchen timer. The Lounge,
+the Pit and Home sit on its orbit. While a cook runs on
 the Pit, embers rise and the bottom of the screen glows like a firebox.
 
 - **In the Hubs app on the tablet** (`window.HubsApp`):
@@ -13,10 +14,10 @@ the Pit, embers rise and the bottom of the screen glows like a firebox.
 - **In any browser,** the pods are plain links.
 - **Samples:** `?demo=cook` shows a pretend brisket; `?demo=night` dims after 4 s; `?boot=0` skips the start-up check.
 
-## The add-ons: his picks 10-28, on preview behind `?try=1`
+## Around the clock: his picks 10-28
 
-They show only at **https://hectorfsv.github.io/hub/?try=1** until he says "put it on". Without the flag, the page the tablet
-runs draws, reads and listens to nothing new (the tests prove it).
+These were on preview (`?try=1`) for an hour. They have been on for everyone since his "Put it on!" that night. Undo:
+revert the commit "Put the add-ons on".
 
 - **Power and air.** Two brackets of 8 cells hug the time.
   - Left: the tablet's battery, from `navigator.getBattery()`. Android's web view answers (checked on the tablet 10-28:
@@ -44,7 +45,8 @@ runs draws, reads and listens to nothing new (the tests prove it).
   - The weather now refreshes every 15 min while the HUB stays on screen. Before, it refreshed only when coming back from
     a service.
   - In landscape, the footer no longer runs "ONLINE" into "HUB".
-- **Samples:** `?try=1&demo=cook` (battery 64%, AQI 38); `?try=1&holiday=halloween` shows a holiday on any day.
+- **Samples:** `?demo=cook` (battery 64%, AQI 38); `?holiday=halloween` (or `xmas`, `thanksgiving`, `newyear`, `july4`) shows
+  a holiday on any day.
 
 ## What it reads (all free, no n8n)
 
@@ -66,19 +68,17 @@ runs draws, reads and listens to nothing new (the tests prove it).
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 163 checks:
+It has 162 checks:
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;
 - the add-ons:
-  - with the flag off: nothing new;
-  - with it on:
-    - the brackets measured against the digits' ink at the widest times (00:00);
-    - the bead taken all the way round its ring at every size;
-    - the timer from the hold to the alarm;
-    - the moon's phase;
-    - the holidays by date;
-    - the battery low, then plugged in.
+  - the brackets measured against the digits' ink at the widest times (00:00);
+  - the bead taken all the way round its ring at every size;
+  - the timer from the hold to the alarm;
+  - the moon's phase;
+  - the holidays by date;
+  - the battery low, then plugged in.
 
 Every page runs on a fake clock inside the saved weather's day (10-28), so the suite passes on any date.
 
