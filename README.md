@@ -34,8 +34,10 @@ revert the commit "Put the add-ons on".
 - **The kitchen timer.** Hold the clock.
   - 12 times from 1 min to 3 h. While it runs: +1, +5 and STOP.
   - A countdown above the time and a ring draining inside the core.
-  - At zero: DONE blinks, the reactor flares, and three tones chime every 2.4 s. That lasts two minutes or until a touch,
-    and the touch does nothing else.
+  - At zero: DONE blinks, the reactor flares, and a kitchen-timer beep-beep-beep-beep sounds every 2.4 s. The beeps are
+    square waves at 2.7 kHz, near full scale; the first soft 1 kHz sines "barely sound" on the tablet. That lasts two
+    minutes or until a touch, and the touch does nothing else. `hub.chime()` plays one burst.
+  - The ring is 60 cells, so each step redraws one cell.
   - The timer survives a reload (`hub.timer`).
   - Sound starts with the tap that starts the timer (the browser's rule).
 - **Holidays,** on the day itself: Halloween, Thanksgiving, Dec 24-25, Dec 31-Jan 1, July 4.
