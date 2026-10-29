@@ -167,6 +167,22 @@ const eyeClear = page => page.evaluate(() => {
   t.textContent = keep;
   return [...new Set(out)];
 });
+// the composited layers Chromium keeps, by element (the tablet's GPU blends every one of them every frame)
+async function layersOf(page) {
+  const c = await page.context().newCDPSession(page);
+  await c.send('DOM.getDocument', { depth: -1 });
+  const got = new Promise(ok => c.on('LayerTree.layerTreeDidChange', e => { if (e.layers) ok(e.layers); }));
+  await c.send('LayerTree.enable');
+  const layers = await Promise.race([got, new Promise(ok => setTimeout(() => ok(null), 4000))]), names = [];
+  for (const l of layers || []) {
+    if (!l.backendNodeId) continue;
+    const { node } = await c.send('DOM.describeNode', { backendNodeId: l.backendNodeId }).catch(() => ({}));
+    const a = (node && node.attributes) || [], i = a.indexOf('id'), k = a.indexOf('class');
+    names.push((node ? node.localName : '?') + (i >= 0 ? '#' + a[i + 1] : '') + (k >= 0 ? '.' + a[k + 1].split(' ')[0] : ''));
+  }
+  await c.send('LayerTree.disable'); await c.detach();
+  return layers ? names : null;
+}
 const lit = page => page.$$eval('#gauges path[stroke-width="3.6"]', ps => ps.map(p => ({ c: p.getAttribute('stroke'), on: +p.getAttribute('opacity') > .5 })));
 const hold = async (page, sel) => { const b = await page.locator(sel).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.clock.runFor(800); await page.mouse.up(); await page.waitForTimeout(150); };
 
@@ -282,6 +298,10 @@ try {
     const near = await eyeClear(page); ok(!near.length, 'the brackets and labels clear the time and the date' + (near.length ? ': ' + near.join(', ') : ''));
     const sweep = await beadSweep(page); ok(!sweep.length, 'the bead, all the way round, stays on screen and clear of the pods, labels, top and bottom' + (sweep.length ? ': ' + sweep.slice(0, 8).join(', ') : ''));
     checkLayout(await page.evaluate(geometry), view + ' try');
+    if (view === 'tablet') {
+      const ls = await layersOf(page), own = (ls || []).filter(n => /#gauges|#tmr|#bead|#chg|\.flare/.test(n));
+      ok(ls && ls.length > 10 && !own.length, `at rest the add-ons keep no layer of their own (${ls ? ls.length : 'no'} layers` + (own.length ? '; theirs: ' + own.join(', ') : '') + ')');
+    }
     await shot(page, `${view}-try-day`);
     ok(!errors.length, errs(errors));
     await ctx.close();

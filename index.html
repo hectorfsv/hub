@@ -95,22 +95,21 @@ body.forge .sweep.hot{opacity:1}body.forge .sweep.cool{opacity:0}
 .date{font-family:var(--disp);font-weight:600;font-size:calc(var(--R)*.074);letter-spacing:.26em;color:var(--gold);opacity:.88;margin-top:calc(var(--R)*.07);padding-left:.26em;white-space:nowrap}
 
 /* ---- the add-ons, his picks 10-28 (on since his "put it on" that night): power and air beside the clock, the day orbit,
-        the hour flare, the kitchen timer, holiday colors. Drawn once; a number changing redraws only its own layer ---- */
-.flare{inset:-14%!important;width:auto!important;height:auto!important;border-radius:50%;opacity:0;visibility:hidden;will-change:transform,opacity;pointer-events:none;
+        the hour flare, the kitchen timer, holiday colors. None has a layer of its own at rest: the tablet's GPU blends
+        every layer every frame, and each extra one cost ~25 late frames in 500 (measured 10-29). The bead is drawn into
+        the static outer ring, the brackets and the timer into the core; the flare and the spark get a layer only while
+        they play ---- */
+.flare{inset:-14%!important;width:auto!important;height:auto!important;border-radius:50%;opacity:0;visibility:hidden;pointer-events:none;
   background:radial-gradient(circle,rgba(255,241,204,.5) 0%,rgba(255,181,71,.3) 26%,rgba(255,140,40,.1) 48%,transparent 68%)}
-#dayring{will-change:transform;pointer-events:none}
-#bead{position:absolute;left:50%;top:.5%;width:calc(var(--R)*.16);height:calc(var(--R)*.16);margin:calc(var(--R)*-.08) 0 0 calc(var(--R)*-.08);will-change:transform}
-body.land #bead{top:2.25%}
-#bead svg{position:absolute;inset:0;width:100%;height:100%}
-#gauges,#tmr{pointer-events:none}
+.core>svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .g-lab,#tm-txt{font-family:var(--mono);font-weight:500;letter-spacing:.5px}
 .g-lab{font-size:6.4px}
 #tm-txt{font-size:7.4px;fill:#FFC46B}
-#tmr{display:none;will-change:opacity}
+#tmr{display:none}
 #tmr.on{display:block}
 #tmr.done{animation:tblink 1.1s ease-in-out infinite}
 @keyframes tblink{0%,100%{opacity:1}50%{opacity:.3}}
-#chg{visibility:hidden;will-change:transform,opacity;pointer-events:none}
+#chg{visibility:hidden;pointer-events:none}
 #chg i{position:absolute;left:50%;top:22.5%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:radial-gradient(circle,#FFFDF5 0 24%,rgba(255,200,90,.95) 44%,transparent 72%)}
 #clock.down{opacity:.7;transition:opacity .15s}
 #sheet .tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
@@ -429,7 +428,7 @@ function layout(force) {
     if (labelSide) Object.assign(l.style, { left: c.x + rp + 16 + 'px', top: c.y - 26 + 'px', width: '210px', transformOrigin: '0 50%' });
     else Object.assign(l.style, { left: c.x - 110 + 'px', top: c.y + rp + 12 + 'px', width: '220px', transformOrigin: '50% 0' });
   });
-  runners(); fitLabels();
+  runners(); fitLabels(); renderDay();
   const bl = $('boot-line'), lg = $('boot-log');   // gone once the boot is over
   if (bl) bl.style.top = cy + 'px';
   if (lg) lg.style.top = (land ? cy - 70 : cy + R * .25) + 'px';
@@ -896,11 +895,11 @@ function demoWx() {
 function addOns() {
   const r = $('reactor');
   r.querySelector('.halo.hot').insertAdjacentHTML('afterend', '<div class="flare" aria-hidden="true"></div>');
-  r.querySelector('.r-sweep').insertAdjacentHTML('afterend', '<div id="dayring" aria-hidden="true"><div id="bead"></div></div>');
-  $('sec').insertAdjacentHTML('afterend', '<svg viewBox="-100 -100 200 200" id="gauges" aria-hidden="true"></svg>'
-    + '<svg viewBox="-100 -100 200 200" id="tmr" aria-hidden="true"><circle r="59.5" fill="none" stroke="#FFB547" stroke-width="1.2" opacity=".16"/>'
-    + '<circle id="tm-arc" r="59.5" fill="none" stroke="#FFC46B" stroke-width="2" stroke-linecap="round" transform="rotate(-90)" stroke-dasharray="0 999"/><text id="tm-txt" y="-39" text-anchor="middle"></text></svg>'
-    + '<div id="chg" aria-hidden="true"><i></i></div>');
+  $('ring-static').insertAdjacentHTML('beforeend', '<g id="bead"></g>');
+  r.querySelector('.core').innerHTML = '<svg viewBox="-62 -62 124 124" id="gauges" aria-hidden="true"></svg>'
+    + '<svg viewBox="-62 -62 124 124" id="tmr" aria-hidden="true"><circle r="59.5" fill="none" stroke="#FFB547" stroke-width="1.2" opacity=".16"/>'
+    + '<circle id="tm-arc" r="59.5" fill="none" stroke="#FFC46B" stroke-width="2" stroke-linecap="round" transform="rotate(-90)" stroke-dasharray="0 999"/><text id="tm-txt" y="-39" text-anchor="middle"></text></svg>';
+  $('sec').insertAdjacentHTML('afterend', '<div id="chg" aria-hidden="true"><i></i></div>');
   S.air = store.get('hub.air');
   power(); air(true); renderGauges();
   S.tmr = store.get('hub.timer');
@@ -992,22 +991,23 @@ let SUN = '';
 function sunSvg() {
   if (SUN) return SUN;
   let rays = ''; for (let a = 0; a < 360; a += 45) { const [x0, y0] = P(7.2, a), [x1, y1] = P(10, a); rays += `M${x0} ${y0}L${x1} ${y1}`; }
-  return (SUN = '<svg viewBox="-12 -12 24 24"><defs><radialGradient id="g-sun"><stop offset="0" stop-color="#FFE9B0" stop-opacity=".75"/><stop offset="1" stop-color="#FFB547" stop-opacity="0"/></radialGradient></defs>'
-    + `<circle r="12" fill="url(#g-sun)"/><path d="${rays}" stroke="#FFD27A" stroke-width="1.3" stroke-linecap="round"/><circle r="5" fill="#FFF6DA"/></svg>`);
+  return (SUN = '<defs><radialGradient id="g-sun"><stop offset="0" stop-color="#FFE9B0" stop-opacity=".75"/><stop offset="1" stop-color="#FFB547" stop-opacity="0"/></radialGradient></defs>'
+    + `<circle r="12" fill="url(#g-sun)"/><path d="${rays}" stroke="#FFD27A" stroke-width="1.3" stroke-linecap="round"/><circle r="5" fill="#FFF6DA"/>`);
 }
 function moonSvg(p) {   // the lit part: the limb on one side, the terminator an ellipse; waxing is lit on the right
   const r = 7, q = p < .5 ? p : 1 - p, rx = (r * Math.abs(Math.cos(2 * Math.PI * q))).toFixed(2);
-  return '<svg viewBox="-12 -12 24 24"><defs><radialGradient id="g-moon"><stop offset="0" stop-color="#FFF1CC" stop-opacity=".45"/><stop offset="1" stop-color="#FFE9B0" stop-opacity="0"/></radialGradient></defs>'
+  return '<defs><radialGradient id="g-moon"><stop offset="0" stop-color="#FFF1CC" stop-opacity=".45"/><stop offset="1" stop-color="#FFE9B0" stop-opacity="0"/></radialGradient></defs>'
     + `<circle r="11" fill="url(#g-moon)"/><circle r="${r}" fill="#FFE9B0" fill-opacity=".14" stroke="#FFE9B0" stroke-width=".5" stroke-opacity=".35"/>`
-    + `<path d="M0 ${-r}A${r} ${r} 0 0 1 0 ${r}A${rx} ${r} 0 0 ${q < .25 ? 0 : 1} 0 ${-r}Z" fill="#FFF1CC"${p < .5 ? '' : ' transform="scale(-1 1)"'}/></svg>`;
+    + `<path d="M0 ${-r}A${r} ${r} 0 0 1 0 ${r}A${rx} ${r} 0 0 ${q < .25 ? 0 : 1} 0 ${-r}Z" fill="#FFF1CC"${p < .5 ? '' : ' transform="scale(-1 1)"'}/>`;
 }
 function renderDay() {
-  const ring = $('dayring'); if (!ring) return;
+  const bead = $('bead'); if (!bead) return;
   const now = Date.now(), pos = S.beadAt != null ? { a: S.beadAt, kind: Math.abs(S.beadAt) < 90 ? 'sun' : 'moon' } : dayPos(now);
-  ring.style.visibility = pos ? '' : 'hidden';
+  bead.style.display = pos ? '' : 'none';
   if (!pos) return;
-  const bead = $('bead'), ph = moonPhase(now), key = pos.kind === 'sun' ? 'sun' : 'moon' + Math.round(ph * 60);
-  ring.style.transform = `rotate(${pos.a.toFixed(2)}deg)`; bead.style.transform = `rotate(${(-pos.a).toFixed(2)}deg)`;
+  const ph = moonPhase(now), key = pos.kind === 'sun' ? 'sun' : 'moon' + Math.round(ph * 60);
+  const [x, y] = P(S.geo && S.geo.land ? 95.5 : 99, pos.a);   // on the outer ring; landscape's pods sit closer, so a little inside
+  bead.setAttribute('transform', `translate(${x} ${y}) scale(.667)`);
   if (key !== S.beadKey) { S.beadKey = key; bead.innerHTML = pos.kind === 'sun' ? sunSvg() : moonSvg(ph); bead.dataset.kind = pos.kind; }
 }
 
