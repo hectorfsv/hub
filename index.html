@@ -93,6 +93,42 @@ body.forge .sweep.hot{opacity:1}body.forge .sweep.cool{opacity:0}
   color:#FFE2A0;text-shadow:0 0 calc(var(--R)*.07) rgba(255,181,71,.55),0 0 calc(var(--R)*.2) rgba(255,140,40,.25)}
 .date{font-family:var(--disp);font-weight:600;font-size:calc(var(--R)*.074);letter-spacing:.26em;color:var(--gold);opacity:.88;margin-top:calc(var(--R)*.07);padding-left:.26em;white-space:nowrap}
 
+/* ---- the add-ons, his picks 10-28 (?try=1 until he says "put it on"): power and air beside the clock, the day orbit,
+        the hour flare, the kitchen timer, holiday colors. Drawn once; a number changing redraws only its own layer ---- */
+.flare{inset:-14%!important;width:auto!important;height:auto!important;border-radius:50%;opacity:0;visibility:hidden;will-change:transform,opacity;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,241,204,.5) 0%,rgba(255,181,71,.3) 26%,rgba(255,140,40,.1) 48%,transparent 68%)}
+#dayring{will-change:transform;pointer-events:none}
+#bead{position:absolute;left:50%;top:.5%;width:calc(var(--R)*.16);height:calc(var(--R)*.16);margin:calc(var(--R)*-.08) 0 0 calc(var(--R)*-.08);will-change:transform}
+body.land #bead{top:2.25%}
+#bead svg{position:absolute;inset:0;width:100%;height:100%}
+#gauges,#tmr{pointer-events:none}
+.g-lab,#tm-txt{font-family:var(--mono);font-weight:500;letter-spacing:.5px}
+.g-lab{font-size:6.4px}
+#tm-txt{font-size:7.4px;fill:#FFC46B}
+#tmr{display:none;will-change:opacity}
+#tmr.on{display:block}
+#tmr.done{animation:tblink 1.1s ease-in-out infinite}
+@keyframes tblink{0%,100%{opacity:1}50%{opacity:.3}}
+#chg{visibility:hidden;will-change:transform,opacity;pointer-events:none}
+#chg i{position:absolute;left:50%;top:22.5%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:radial-gradient(circle,#FFFDF5 0 24%,rgba(255,200,90,.95) 44%,transparent 72%)}
+#clock.down{opacity:.7;transition:opacity .15s}
+#sheet .tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+#sheet .left{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:#FFC46B}
+/* holidays, on the day only: the gold dust and the orbit's sparks wear the day's colors */
+body[data-hol] .mote:nth-child(3n+1){background:radial-gradient(circle,rgba(var(--h1),.95) 0%,rgba(var(--h1),.5) 35%,rgba(var(--h1),0) 70%)}
+body[data-hol] .mote:nth-child(3n+2){background:radial-gradient(circle,rgba(var(--h2),.95) 0%,rgba(var(--h2),.5) 35%,rgba(var(--h2),0) 70%)}
+body[data-hol] .mote:nth-child(3n){background:radial-gradient(circle,rgba(var(--h3),.95) 0%,rgba(var(--h3),.5) 35%,rgba(var(--h3),0) 70%)}
+body[data-hol] .runner:nth-child(1) i{background:radial-gradient(circle,#FFFFFF 0 22%,rgba(var(--h1),.9) 40%,transparent 70%)}
+body[data-hol] .runner:nth-child(2) i{background:radial-gradient(circle,#FFFFFF 0 22%,rgba(var(--h2),.9) 40%,transparent 70%)}
+body[data-hol] .runner:nth-child(3) i{background:radial-gradient(circle,#FFFFFF 0 22%,rgba(var(--h3),.9) 40%,transparent 70%)}
+body[data-hol] .greet b{color:rgb(var(--hg))}
+body[data-hol=halloween]{--h1:176,92,255;--h2:124,255,79;--h3:255,138,30;--hg:196,140,255}
+body[data-hol=thanksgiving]{--h1:226,72,61;--h2:255,154,46;--h3:201,133,46;--hg:255,120,70}
+body[data-hol=xmas]{--h1:255,74,74;--h2:63,208,122;--h3:255,255,255;--hg:255,96,96}
+body[data-hol=newyear]{--h1:255,233,176;--h2:217,222,232;--h3:255,255,255;--hg:236,240,248}
+body[data-hol=july4]{--h1:255,74,74;--h2:255,255,255;--h3:91,140,255;--hg:130,165,255}
+body.try #foot{gap:14px}
+
 /* ---- the orbit ---- */
 #orbit{position:absolute;z-index:3;pointer-events:none}
 #runners{position:absolute;z-index:3;pointer-events:none}
@@ -263,6 +299,7 @@ body.dim #scan,body.dim #motes{display:none}
 const APP = window.HubsApp || null;          // the Hubs app on the desk tablet; absent in a browser
 const Q = new URLSearchParams(location.search);
 const DEMO = Q.get('demo') || '';
+const TRY = Q.has('try');                    // the add-ons (his picks 10-28): only with ?try=1 until he says "put it on"
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const MIN = 60e3;
 const PLACE = { lat: 34.3917, lon: -118.5426, name: 'SANTA CLARITA' };   // the point the Lounge's weather uses
@@ -532,10 +569,15 @@ function tick() {
   const d = new Date();
   $('time').textContent = hm(d);
   $('date').textContent = `${DAYS[d.getDay()]} · ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const h = d.getHours();
-  $('greet').textContent = (h < 5 ? 'LATE NIGHT' : h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING') + ', HECTOR';
+  const h = d.getHours(), hol = TRY ? holiday(d) : '';
+  if (TRY && hol !== (body.dataset.hol || '')) { if (hol) body.dataset.hol = hol; else delete body.dataset.hol; if (S.booted) motes(); }
+  $('greet').textContent = (hol ? HELLO[hol](d) : h < 5 ? 'LATE NIGHT' : h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING') + ', HECTOR';
   const sec = $('sec'); sec.style.animationDelay = -(d.getSeconds() + d.getMilliseconds() / 1000) + 's';
   renderSun(); if (S.cook) renderCook();
+  if (TRY && S.booted) {
+    if (d.getMinutes() === 0 && d.getSeconds() < 5 && !S.dimmed && !doc.hidden && S.flared !== d.toDateString() + h) { S.flared = d.toDateString() + h; hourFlare(); }
+    if (!doc.hidden) { weather(false); air(false); }   // a HUB left on screen for hours keeps its weather fresh (every 15 min)
+  }
   clearTimeout(tick.t); tick.t = setTimeout(tick, 60000 - d.getSeconds() * 1000 - d.getMilliseconds() + 30);
 }
 
@@ -575,6 +617,7 @@ function renderSun() {
   let txt = PLACE.name;
   if (s) txt = (now < s.rise[0] ? `SUNRISE ${f(s.rise[0])}` : now < s.set[0] ? `SUNSET ${f(s.set[0])}` : s.rise[1] ? `SUNRISE ${f(s.rise[1])}` : PLACE.name) + ' · ' + PLACE.name;
   $('sun').textContent = txt;
+  renderDay();
 }
 function isNight() {
   if (DEMO === 'night') return true;
@@ -745,11 +788,12 @@ function rising(rise, drift, sway, waves, [peak, mid], inAt = .07, midAt = .55) 
 function motes() {
   const box = $('motes'); box.innerHTML = '';
   const W = innerWidth, H = innerHeight;
+  const hol = !!body.dataset.hol;   // a holiday's dust is brighter and a little bigger, so its colors show
   for (let k = 0; k < 14; k++) {
-    const size = rnd(4, 8), o = doc.createElement('i'); o.className = 'pt mote';
+    const size = hol ? rnd(5, 10) : rnd(4, 8), o = doc.createElement('i'); o.className = 'pt mote';
     Object.assign(o.style, { left: rnd(8, W - 8) + 'px', width: size + 'px', height: size + 'px' });
     box.appendChild(o);
-    const dur = rnd(26000, 46000), peak = rnd(.25, .6);
+    const dur = rnd(26000, 46000), peak = hol ? rnd(.6, .95) : rnd(.25, .6);
     o.animate(rising(H * rnd(.6, 1.05), rnd(-40, 40), 6, rnd(3, 6), [peak, peak * .7], .2, .75), { duration: dur, iterations: Infinity, delay: -rnd(0, dur) });
   }
   const sc = $('scan');
@@ -760,7 +804,7 @@ function motes() {
 // ---- night: a minute untouched after sunset, the screen dims to the reactor ----
 function idleTick() {
   const quiet = Date.now() - S.idleAt > (DEMO === 'night' ? 4000 : 60000);
-  if (isNight() && quiet && !doc.hidden && !S.sheet && !S.launching && !S.dimmed) {
+  if (isNight() && quiet && !doc.hidden && !S.sheet && !S.launching && !S.dimmed && !S.alarm) {
     S.dimmed = true; body.classList.add('dim'); if (APP) APP.dim(true);
     slow(.45);
   }
@@ -819,10 +863,10 @@ function finishBoot() {
 // ---- in and out of view: nothing runs while a service is on screen ----
 doc.addEventListener('visibilitychange', () => {
   if (doc.hidden) return;
-  S.idleAt = Date.now(); tick(); weather(false); pitPoll();
+  S.idleAt = Date.now(); tick(); weather(false); pitPoll(); air(false); renderTimer();
   if (Date.now() - (S.checkedAt || 0) > 5 * MIN) { S.checkedAt = Date.now(); checkAll(); }
 });
-window.addEventListener('online', () => { weather(true); checkAll(); pitPoll(); });
+window.addEventListener('online', () => { weather(true); checkAll(); pitPoll(); air(true); });
 window.addEventListener('offline', () => { $('net').textContent = 'OFFLINE'; $('net').classList.add('off'); });
 let rz = 0;
 window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const w = S.geo && S.geo.W; layout(); if (S.geo.W !== w) { motes(); if (body.classList.contains('forge')) { body.classList.remove('forge'); forge(true); } } }, 120); });
@@ -847,17 +891,248 @@ function demoWx() {
     daily: { weather_code: [1, 2], temperature_2m_max: [76, 74], temperature_2m_min: [51, 50], sunrise: [iso(new Date(day.getTime() + 7.1 * 3600e3)), iso(new Date(day.getTime() + 31.1 * 3600e3))], sunset: [iso(new Date(day.getTime() + 18.1 * 3600e3)), iso(new Date(day.getTime() + 42.1 * 3600e3))] } };
 }
 
+// ---- the add-ons, his picks 10-28 (?try=1 until he says "put it on"): power and air beside the clock, the day orbit,
+//      the hour flare, the kitchen timer, holiday colors. Each is drawn once and redrawn only when its number changes;
+//      the bead turns once a minute; the flare and the charging spark are one-shots ----
+function addOns() {
+  const r = $('reactor');
+  body.classList.add('try');
+  r.querySelector('.halo.hot').insertAdjacentHTML('afterend', '<div class="flare" aria-hidden="true"></div>');
+  r.querySelector('.r-sweep').insertAdjacentHTML('afterend', '<div id="dayring" aria-hidden="true"><div id="bead"></div></div>');
+  $('sec').insertAdjacentHTML('afterend', '<svg viewBox="-100 -100 200 200" id="gauges" aria-hidden="true"></svg>'
+    + '<svg viewBox="-100 -100 200 200" id="tmr" aria-hidden="true"><circle r="59.5" fill="none" stroke="#FFB547" stroke-width="1.2" opacity=".16"/>'
+    + '<circle id="tm-arc" r="59.5" fill="none" stroke="#FFC46B" stroke-width="2" stroke-linecap="round" transform="rotate(-90)" stroke-dasharray="0 999"/><text id="tm-txt" y="-39" text-anchor="middle"></text></svg>'
+    + '<div id="chg" aria-hidden="true"><i></i></div>');
+  S.air = store.get('hub.air');
+  power(); air(true); renderGauges();
+  S.tmr = store.get('hub.timer');
+  if (S.tmr && (S.tmr.done || S.tmr.end < Date.now() - 120e3)) { S.tmr = null; store.del('hub.timer'); }
+  renderTimer();
+  press($('clock'), () => {}, openTimer);   // hold the clock: the kitchen timer
+  doc.addEventListener('pointerdown', e => {   // a finished timer: the first touch stops it, and does nothing else
+    if (!S.tmr || !S.tmr.done) return;
+    stopTimer(); S.swallow = Date.now() + 650; e.stopPropagation();
+  }, true);
+}
+
+// power: the tablet's own battery (Android's web view tells the page; an iPhone doesn't, and the bracket shows a dash)
+function power() {
+  if (DEMO) { S.bat = { level: .64, charging: false }; return; }
+  if (!navigator.getBattery) return;
+  navigator.getBattery().then(b => {
+    const read = () => {
+      const was = S.bat;
+      S.bat = { level: b.level, charging: b.charging };
+      if (was && !was.charging && b.charging) spark();
+      if (b.charging) S.lowSaid = false;
+      else if (b.level < .1 && !S.lowSaid) { S.lowSaid = true; toast('BATTERY LOW · PLUG ME IN', 5000); }
+      renderGauges();
+    };
+    read(); b.addEventListener('levelchange', read); b.addEventListener('chargingchange', read);
+  }).catch(() => {});
+}
+// air: the US AQI from Open-Meteo's air-quality service (free, no key), once an hour while the HUB is on screen
+async function air(force) {
+  if (!$('gauges')) return;
+  if (DEMO) { S.air = { at: Date.now(), aqi: 38 }; renderGauges(); return; }
+  if (!force && S.air && Date.now() - S.air.at < 60 * MIN) return;
+  try {
+    const r = await fetchT(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${PLACE.lat}&longitude=${PLACE.lon}&current=us_aqi`, 9000);
+    if (!r.ok) throw new Error(r.status);
+    const v = ((await r.json()).current || {}).us_aqi;
+    if (typeof v === 'number') { S.air = { at: Date.now(), aqi: v }; store.set('hub.air', S.air); }
+  } catch (e) { /* keep the last reading: it shows for three hours */ }
+  renderGauges();
+}
+// a bracket of 8 cells hugging the clock, filled from the bottom: side -1 = left (power), 1 = right (air). ±28° keeps
+// the top cells clear of the widest time's corners (00:00's ink reaches 53 units out; the cells start at 53.2)
+function bracket(side, lit, color) {
+  const n = 8, r = 55, span = 28, gap = 2.2, cell = (2 * span - (n - 1) * gap) / n;
+  const dir = side < 0 ? 1 : -1, bottom = (side < 0 ? 270 : 90) - dir * span;
+  let s = '';
+  for (let k = 0; k < n; k++) {
+    const a0 = bottom + dir * k * (cell + gap), [x0, y0] = P(r, a0), [x1, y1] = P(r, a0 + dir * cell);
+    s += `<path d="M${x0} ${y0}A${r} ${r} 0 0 ${dir > 0 ? 1 : 0} ${x1} ${y1}" fill="none" stroke="${color}" stroke-width="3.6" opacity="${k < lit ? .95 : .16}"/>`;
+  }
+  return s;
+}
+function renderGauges() {
+  const g = $('gauges'); if (!g) return;
+  const b = S.bat, aq = S.air && Date.now() - S.air.at < 3 * 3600e3 ? Math.round(S.air.aqi) : null;
+  const low = !!b && !b.charging && b.level < .2, chg = !!b && b.charging, pct = b ? Math.round(b.level * 100) : null;
+  const pl = b ? clamp(Math.ceil(b.level * 8 - 1e-6), 1, 8) : 0, al = aq == null ? 0 : clamp(Math.ceil(aq / 25), 1, 8);
+  const pc = low ? '#FF3B30' : '#FFB547', ac = aq == null ? '#FFB547' : aq <= 50 ? '#FFD27A' : aq <= 100 ? '#FFB547' : aq <= 150 ? '#FF8A3A' : '#FF3B30';
+  const key = [pl, pc, pct, chg, al, ac, aq].join();
+  if (key === S.gKey) return; S.gKey = key;
+  g.innerHTML = bracket(-1, pl, pc) + bracket(1, al, ac)
+    + (chg ? '<path id="bolt" d="M-41 31.8l-3.4 4.1h1.9l-1.1 3.1 3.2-4.6h-1.9z" fill="#FFE9B0"/>' : '')
+    + `<text class="g-lab" id="pw-lab" x="${chg ? -39.4 : -44.6}" y="38.6" fill="${low ? '#FF8A80' : '#FFD27A'}">${pct == null ? '—' : pct + '%'}</text>`
+    + `<text class="g-lab" id="aq-lab" x="44.6" y="38.6" text-anchor="end" fill="${aq != null && aq > 100 ? ac : '#FFD27A'}"><tspan fill="#9A8C8A">AQI </tspan>${aq == null ? '—' : aq}</text>`;
+}
+// plugged in: a spark runs up the power bracket
+function spark() {
+  const c = $('chg'); if (!c) return;
+  c.style.visibility = 'visible';
+  const a = c.animate([{ transform: 'rotate(234deg)', opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 1, offset: .8 }, { transform: 'rotate(306deg)', opacity: 0 }], { duration: 1100, easing: 'cubic-bezier(.4,0,.2,1)' });
+  a.onfinish = a.oncancel = () => { c.style.visibility = 'hidden'; };
+  S.sparks = (S.sparks || 0) + 1;
+}
+
+// the day orbit: the sun rides the reactor's outer ring from sunrise (left) over the top to sunset (right); after dark the
+// moon, in its real phase, rides the bottom half back. One layer turned once a minute.
+const moonPhase = t => { const p = ((t / 86400e3 + 2440587.5 - 2451550.26) / 29.530588853) % 1; return p < 0 ? p + 1 : p; };   // 0 new, .5 full
+function dayPos(now) {
+  const s = sunTimes(); if (!s) return null;
+  const [r0, r1] = s.rise, [s0, s1] = s.set, y0 = s0 - 86400e3;   // last night began about a day before tonight's sunset
+  if (now >= r0 && now < s0) return { a: -90 + 180 * (now - r0) / (s0 - r0), kind: 'sun' };
+  if (r1 && now >= s0 && now < r1) return { a: 90 + 180 * (now - s0) / (r1 - s0), kind: 'moon' };
+  if (now < r0 && now >= y0) return { a: 90 + 180 * (now - y0) / (r0 - y0), kind: 'moon' };
+  if (r1 && s1 && now >= r1 && now < s1) return { a: -90 + 180 * (now - r1) / (s1 - r1), kind: 'sun' };
+  return null;
+}
+let SUN = '';
+function sunSvg() {
+  if (SUN) return SUN;
+  let rays = ''; for (let a = 0; a < 360; a += 45) { const [x0, y0] = P(7.2, a), [x1, y1] = P(10, a); rays += `M${x0} ${y0}L${x1} ${y1}`; }
+  return (SUN = '<svg viewBox="-12 -12 24 24"><defs><radialGradient id="g-sun"><stop offset="0" stop-color="#FFE9B0" stop-opacity=".75"/><stop offset="1" stop-color="#FFB547" stop-opacity="0"/></radialGradient></defs>'
+    + `<circle r="12" fill="url(#g-sun)"/><path d="${rays}" stroke="#FFD27A" stroke-width="1.3" stroke-linecap="round"/><circle r="5" fill="#FFF6DA"/></svg>`);
+}
+function moonSvg(p) {   // the lit part: the limb on one side, the terminator an ellipse; waxing is lit on the right
+  const r = 7, q = p < .5 ? p : 1 - p, rx = (r * Math.abs(Math.cos(2 * Math.PI * q))).toFixed(2);
+  return '<svg viewBox="-12 -12 24 24"><defs><radialGradient id="g-moon"><stop offset="0" stop-color="#FFF1CC" stop-opacity=".45"/><stop offset="1" stop-color="#FFE9B0" stop-opacity="0"/></radialGradient></defs>'
+    + `<circle r="11" fill="url(#g-moon)"/><circle r="${r}" fill="#FFE9B0" fill-opacity=".14" stroke="#FFE9B0" stroke-width=".5" stroke-opacity=".35"/>`
+    + `<path d="M0 ${-r}A${r} ${r} 0 0 1 0 ${r}A${rx} ${r} 0 0 ${q < .25 ? 0 : 1} 0 ${-r}Z" fill="#FFF1CC"${p < .5 ? '' : ' transform="scale(-1 1)"'}/></svg>`;
+}
+function renderDay() {
+  const ring = $('dayring'); if (!ring) return;
+  const now = Date.now(), pos = S.beadAt != null ? { a: S.beadAt, kind: Math.abs(S.beadAt) < 90 ? 'sun' : 'moon' } : dayPos(now);
+  ring.style.visibility = pos ? '' : 'hidden';
+  if (!pos) return;
+  const bead = $('bead'), ph = moonPhase(now), key = pos.kind === 'sun' ? 'sun' : 'moon' + Math.round(ph * 60);
+  ring.style.transform = `rotate(${pos.a.toFixed(2)}deg)`; bead.style.transform = `rotate(${(-pos.a).toFixed(2)}deg)`;
+  if (key !== S.beadKey) { S.beadKey = key; bead.innerHTML = pos.kind === 'sun' ? sunSvg() : moonSvg(ph); bead.dataset.kind = pos.kind; }
+}
+
+// the hour flare: on the hour the reactor surges once and its rings kick, then settle (never while dimmed)
+function hourFlare() {
+  const f = doc.querySelector('#reactor .flare'); if (!f) return;
+  f.style.visibility = 'visible';
+  const a = f.animate([{ opacity: 0, transform: 'scale(.86)' }, { opacity: .95, transform: 'scale(1.06)', offset: .28 }, { opacity: 0, transform: 'scale(1.22)' }], { duration: 1700, easing: 'cubic-bezier(.2,.7,.3,1)' });
+  a.onfinish = a.oncancel = () => { if (!f.getAnimations().length) f.style.visibility = 'hidden'; };
+  const kick = (id, from) => $(id).animate([{ transform: `rotate(${from}deg)` }, { transform: 'rotate(0)' }], { duration: 1600, easing: 'cubic-bezier(.15,.85,.25,1)' });
+  kick('up-seg', -110); kick('up-ticks', 60);
+  S.flares = (S.flares || 0) + 1;
+}
+
+// the kitchen timer: hold the clock, pick a time; it counts down on the reactor and at zero the reactor flares and chimes
+// every 2.4 s for two minutes or until a touch. It survives a reload ('hub.timer').
+const T = {}, SND = {};
+const pad2 = n => String(n).padStart(2, '0');
+function clockLeft(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + ':' + pad2(m) : m) + ':' + pad2(s % 60); }
+function openTimer() {
+  if (S.sheet) return;
+  const f = $('sheet'), run = !!(S.tmr && !S.tmr.done);
+  S.sheet = 'timer'; wake();
+  f.innerHTML = '<h2>KITCHEN TIMER</h2>'
+    + (run ? '<p class="left" id="tm-left"></p>' : '<p>Pick a time. It counts down on the reactor; at zero the reactor flares and chimes until you touch the screen.</p>')
+    + `<div class="tgrid">${[1, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180].map(m => `<button type="button" data-min="${m}">${m === 60 || m > 90 ? m / 60 + ' H' : m + ' MIN'}</button>`).join('')}</div>`
+    + (run ? '<div class="row"><button type="button" data-add="1">+1 MIN</button><button type="button" data-add="5">+5 MIN</button><button type="button" id="tm-stop">STOP</button></div>' : '')
+    + '<div class="row"><button type="button" id="sh-x">CLOSE</button></div>';
+  f.hidden = false;
+  f.querySelectorAll('[data-min]').forEach(bt => { bt.onclick = () => { closeSheet(); startTimer(+bt.dataset.min * MIN); }; });
+  f.querySelectorAll('[data-add]').forEach(bt => { bt.onclick = () => { closeSheet(); addTimer(+bt.dataset.add * MIN); }; });
+  if (run) $('tm-stop').onclick = () => { closeSheet(); stopTimer(); toast('TIMER STOPPED'); };
+  $('sh-x').onclick = closeSheet;
+  renderTimer();
+}
+function startTimer(ms) {
+  audioOn(); beep(1, 1318.5, .14);
+  S.tmr = { end: Date.now() + ms, len: ms }; store.set('hub.timer', S.tmr);
+  renderTimer(); toast('TIMER · ' + clockLeft(ms));
+}
+function addTimer(ms) {
+  if (!S.tmr || S.tmr.done) return;
+  S.tmr.end += ms; S.tmr.len += ms; store.set('hub.timer', S.tmr);
+  renderTimer(); toast(`+${ms / MIN} MIN · ${clockLeft(S.tmr.end - Date.now())} LEFT`);
+}
+function stopTimer() {
+  S.tmr = null; S.alarm = false; store.del('hub.timer');
+  clearTimeout(T.alarm); renderTimer();
+}
+function renderTimer() {
+  const g = $('tmr'); if (!g) return;
+  clearTimeout(T.t);
+  const t = S.tmr;
+  g.classList.toggle('on', !!t); g.classList.toggle('done', !!(t && t.done));
+  if (!t) return;
+  const left = t.end - Date.now();
+  if (!t.done && left <= 0) { timerDone(); return; }
+  $('tm-arc').setAttribute('stroke-dasharray', `${((t.done ? 1 : clamp(left / t.len, 0, 1)) * 373.85).toFixed(1)} 999`);
+  $('tm-txt').textContent = t.done ? 'DONE' : clockLeft(left);
+  const lf = $('tm-left'); if (lf) lf.textContent = t.done ? 'DONE' : `RUNNING · ${clockLeft(left)} LEFT`;
+  if (!t.done) T.t = setTimeout(renderTimer, doc.hidden ? left + 30 : (left - 1) % 1000 + 30);   // hidden: one wake-up, at zero
+}
+function timerDone() {
+  const t = S.tmr; t.done = true; t.doneAt = Date.now(); store.set('hub.timer', t);
+  renderTimer(); wake(); if (!SND.ctx) audioOn();
+  toast('TIMER DONE', 6000);
+  S.alarm = true; alarm();
+}
+function alarm() {
+  clearTimeout(T.alarm);
+  if (!S.alarm || !S.tmr) return;
+  if (Date.now() - S.tmr.doneAt > 120e3) { S.alarm = false; T.alarm = setTimeout(stopTimer, 28 * MIN); return; }   // then DONE waits half an hour
+  if (!doc.hidden) hourFlare();
+  beep(3, 1046.5);
+  T.alarm = setTimeout(alarm, 2400);
+}
+// sound: a touch is the browser's permission, so the tap that starts a timer opens it
+function audioOn() {
+  try { SND.ctx = SND.ctx || new (window.AudioContext || window.webkitAudioContext)(); if (SND.ctx.state === 'suspended') SND.ctx.resume().catch(() => {}); } catch (e) { SND.ctx = null; }
+}
+function beep(n, hz, vol = .32) {
+  const c = SND.ctx; if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  const t0 = c.currentTime + .03;
+  for (let k = 0; k < n; k++) {
+    const t = t0 + k * .2, o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.value = hz;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + .16);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + .18);
+  }
+}
+
+// holidays, on the day only: the dust and the orbit's sparks wear the day's colors, and the greeting says so
+const HELLO = {
+  halloween: () => 'HAPPY HALLOWEEN', thanksgiving: () => 'HAPPY THANKSGIVING', july4: () => 'HAPPY 4TH OF JULY',
+  xmas: d => d.getMonth() === 11 && d.getDate() === 24 ? 'MERRY CHRISTMAS EVE' : 'MERRY CHRISTMAS',
+  newyear: d => d.getMonth() === 11 ? "HAPPY NEW YEAR'S EVE" : 'HAPPY NEW YEAR',
+};
+function holiday(d) {
+  const f = Q.get('holiday'); if (f && HELLO[f]) return f;   // ?holiday=halloween shows one on any day
+  const m = d.getMonth() + 1, day = d.getDate();
+  return m === 10 && day === 31 ? 'halloween' : m === 11 && d.getDay() === 4 && day >= 22 && day <= 28 ? 'thanksgiving'
+    : m === 12 && (day === 24 || day === 25) ? 'xmas' : (m === 12 && day === 31) || (m === 1 && day === 1) ? 'newyear' : m === 7 && day === 4 ? 'july4' : '';
+}
+
 // ---- for the app and the tests ----
 window.hub = {
   returned,
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
-  state() { return JSON.stringify({ booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() }); },
+  state() {
+    const o = { booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() };
+    if (TRY) Object.assign(o, { bat: S.bat, air: S.air ? S.air.aqi : null, day: dayPos(Date.now()), bead: $('bead').dataset.kind || '', tmr: S.tmr, alarm: !!S.alarm, flares: S.flares || 0, sparks: S.sparks || 0, hol: body.dataset.hol || '' });
+    return JSON.stringify(o);
+  },
   demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
+
+if (TRY) Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare });
 
 // ---- start ----
 if (APP) body.classList.add('app');
 loadServices(); drawRings(); buildPods(); layout(true);
+if (TRY) addOns();
 S.wx = store.get('hub.wx'); renderWx(); tick(); motes();
 setInterval(idleTick, 5000);
 S.checkedAt = Date.now();

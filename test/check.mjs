@@ -1,6 +1,8 @@
 // node test/check.mjs [--shots]   The HUB in headless Chromium at the desk tablet's size and others. Nothing real is
-// called: the weather is a saved Open-Meteo answer, the Pit's notebook and the services' pages are routed fakes, and
-// window.HubsApp is a recorder standing in for the app. Screenshots land in test/shots/ (not committed).
+// called: the weather and the air are saved Open-Meteo answers, the Pit's notebook and the services' pages are routed
+// fakes, the battery is a stand-in, and window.HubsApp is a recorder standing in for the app. Every page runs on a
+// fake clock set inside the saved weather's day (10-28), so the suite passes on any date. Screenshots land in
+// test/shots/ (not committed).
 import { createRequire } from 'node:module';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -12,6 +14,8 @@ const { chromium } = require(path.join(os.homedir(), 'Documents/Jarvis/projects/
 const HERE = path.dirname(new URL(import.meta.url).pathname), ROOT = path.dirname(HERE);
 const SHELL = path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-x64/chrome-headless-shell');
 const WX = fs.readFileSync(path.join(HERE, 'fixtures/wx.json'), 'utf8');
+const AIR = fs.readFileSync(path.join(HERE, 'fixtures/air.json'), 'utf8');   // US AQI 70, read live 10-28 22:00
+const AT = '2026-10-28T17:30:00-07:00', T0 = Date.parse(AT);                  // inside the saved weather (sunrise 07:10, sunset 18:04)
 const SHOTS = path.join(HERE, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 
@@ -34,22 +38,24 @@ const VIEWS = {
   iphone: { viewport: { width: 440, height: 956 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
   desktop: { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
 };
-const COOK = [{ id: 7, meat: 'Brisket', status: 'running', started_at: new Date(Date.now() - 372 * 60e3).toISOString(),
+const COOK = [{ id: 7, meat: 'Brisket', status: 'running', started_at: new Date(T0 - 372 * 60e3).toISOString(),
   state: { phase: 'cook', probes: { brisket: 'p0' }, plan: { name: 'Monclova low n slow', probes: ['brisket'], tracks: { brisket: [{ until: { at_least: 203 } }] } } } }];
-const READING = [{ at: new Date(Date.now() - 30e3).toISOString(), pit: 251, setpoint: 250, probes: { p0: 168.4 } }];
+const READING = [{ at: new Date(T0 - 30e3).toISOString(), pit: 251, setpoint: 250, probes: { p0: 168.4 } }];
 
 let failures = 0;
 const ok = (cond, what) => { if (cond) console.log('  ok  ', what); else { failures++; console.log('  FAIL', what); } };
 
 const browser = await chromium.launch({ executablePath: SHELL });
-async function open(view, { app = false, linked = false, cooking = false, query = '' } = {}) {
-  const ctx = await browser.newContext(VIEWS[view]);
+async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null } = {}) {
+  const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
-  const errors = [];
+  await page.clock.install({ time: new Date(at) });
+  const errors = [], hits = { air: 0 };
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('https://api.open-meteo.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: WX }));
   await page.route('https://hectorfsv.github.io/**', r => r.fulfill({ status: 200, body: '' }));
+  await page.route('https://air-quality-api.open-meteo.com/**', r => { hits.air++; r.fulfill({ status: 200, contentType: 'application/json', body: AIR }); });
   const pit = { cooks: cooking ? COOK : [], token: 0 };
   await page.route('https://pit.test/**', r => {
     const u = r.request().url();
@@ -58,7 +64,15 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(READING) });
     return r.fulfill({ status: 404, body: '' });
   });
-  await page.addInitScript(([app, linked]) => {
+  await page.addInitScript(([app, linked, bat]) => {
+    // the battery: a stand-in the test can plug in and out; every read is counted
+    window.__batCalls = 0;
+    const real = navigator.getBattery && navigator.getBattery.bind(navigator);
+    if (bat) { window.__bat = Object.assign(new EventTarget(), { level: bat.level, charging: bat.charging, chargingTime: 0, dischargingTime: Infinity }); }
+    if (bat || real) Object.defineProperty(navigator, 'getBattery', { configurable: true, value: () => { window.__batCalls++; return bat ? Promise.resolve(window.__bat) : real(); } });
+    // sound: every tone the page makes is counted
+    window.__beeps = 0;
+    if (window.AudioContext) { const AC = window.AudioContext; window.AudioContext = class extends AC { createOscillator() { window.__beeps++; return super.createOscillator(); } }; }
     if (linked) localStorage.setItem('hub.pit', JSON.stringify({ access_token: 'a0', refresh_token: 'r0', expires_at: Date.now() + 3e6, email: 'pit@test' }));
     if (app) {
       window.__calls = [];
@@ -70,9 +84,9 @@ async function open(view, { app = false, linked = false, cooking = false, query 
         open: i => window.__calls.push('open:' + i), talk: () => window.__calls.push('talk'), panel: () => window.__calls.push('panel'), dim: on => window.__calls.push('dim:' + on),
       };
     }
-  }, [app, linked]);
+  }, [app, linked, battery]);
   await page.goto(BASE + (query ? '?' + query : ''));
-  return { ctx, page, errors, pit };
+  return { ctx, page, errors, pit, hits };
 }
 
 // every box that must stay on screen and clear of the others
@@ -105,6 +119,56 @@ function checkLayout(g, name) {
 }
 const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.png') });
 const state = page => page.evaluate(() => JSON.parse(window.hub.state()));
+const errs = errors => 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : '');
+// the add-ons: the bead taken all the way round its ring must stay on screen and clear of the pods, labels, top and bottom
+const beadSweep = page => page.evaluate(() => {
+  const g = JSON.parse(window.hub.state()).geo, rad = g.R * .08, hits = [], rects = [];
+  const vis = e => e && e.getClientRects().length && getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden';
+  document.querySelectorAll('.label').forEach((l, i) => [...l.children].filter(vis).forEach(c => rects.push(['label' + i, c.getBoundingClientRect()])));
+  for (const id of ['greet', 'sun', 'wx', 'hours', 'foot']) { const e = document.getElementById(id); if (vis(e)) rects.push([id, e.getBoundingClientRect()]); }
+  for (let a = -90; a <= 270; a += 7.5) {
+    window.hub.bead(a);
+    const b = document.getElementById('bead').getBoundingClientRect(), cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
+    if (cx - rad < 0 || cy - rad < 0 || cx + rad > innerWidth || cy + rad > innerHeight) hits.push(a + '°:off screen');
+    g.pods.forEach((p, i) => { if (Math.hypot(cx - p.x, cy - p.y) < rad + g.rp) hits.push(a + '°:pod' + i); });
+    for (const [n, r] of rects) { const dx = Math.max(r.left - cx, 0, cx - r.right), dy = Math.max(r.top - cy, 0, cy - r.bottom); if (Math.hypot(dx, dy) < rad) hits.push(a + '°:' + n); }
+  }
+  window.hub.bead(null);
+  return hits;
+});
+// the brackets, their labels and the timer's countdown stay 2 px clear of the digits and the date, the widest times
+// included. Measured against the ink (a canvas measures the same font), not the line box, which is taller than the digits;
+// a cell is checked along its arc, not by its square box
+const eyeClear = page => page.evaluate(() => {
+  const ink = el => {
+    const cs = getComputedStyle(el), rg = document.createRange(); rg.selectNodeContents(el);
+    const rr = rg.getBoundingClientRect(), c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; c.letterSpacing = cs.letterSpacing;
+    const m = c.measureText(el.textContent), base = rr.top + m.fontBoundingBoxAscent;
+    return { left: rr.left - m.actualBoundingBoxLeft, right: rr.left + m.actualBoundingBoxRight, top: base - m.actualBoundingBoxAscent, bottom: base + m.actualBoundingBoxDescent };
+  };
+  const t = document.getElementById('time'), keep = t.textContent, out = [], g = document.getElementById('gauges'), m = g.getScreenCTM();
+  const near = (x, y, b, pad) => Math.hypot(Math.max(b.left - x, 0, x - b.right), Math.max(b.top - y, 0, y - b.bottom)) < pad;
+  for (const s of [keep, '00:00', '08:48']) {
+    t.textContent = s;
+    const boxes = [['time ' + s, ink(t)], ['date', ink(document.getElementById('date'))]];
+    for (const p of g.querySelectorAll('path')) {
+      const half = (parseFloat(p.getAttribute('stroke-width')) || 0) / 2 * m.a, L = p.getTotalLength();
+      for (let i = 0; i <= 12; i++) {
+        const q = p.getPointAtLength(L * i / 12), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f;
+        for (const [n, b] of boxes) if (near(x, y, b, half + 2)) out.push(`${p.id || 'cell'}×${n}`);
+      }
+    }
+    for (const e of document.querySelectorAll('#gauges text, #tmr.on text')) {
+      const r = e.getBoundingClientRect();
+      for (const [n, b] of boxes) if (Math.min(r.right, b.right) - Math.max(r.left, b.left) > -2 && Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top) > -2) out.push(`${e.id}×${n}`);
+    }
+  }
+  t.textContent = keep;
+  return [...new Set(out)];
+});
+const lit = page => page.$$eval('#gauges path[stroke-width="3.6"]', ps => ps.map(p => ({ c: p.getAttribute('stroke'), on: +p.getAttribute('opacity') > .5 })));
+const hold = async (page, sel) => { const b = await page.locator(sel).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.clock.runFor(800); await page.mouse.up(); await page.waitForTimeout(150); };
 
 try {
   // 1. a browser, first visit: the boot check, the weather, the Pit asking to be linked
@@ -200,6 +264,139 @@ try {
     const calls = await page.evaluate(() => window.__calls);
     ok(calls.includes('dim:false') && !calls.includes('open:0'), 'the first touch wakes it and opens nothing');
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+    await ctx.close();
+  }
+
+  // 6. the add-ons wait behind ?try=1: without it, the page the tablet runs draws, reads and listens to nothing new
+  {
+    console.log('\ntablet: app, no ?try (what the tablet runs today)');
+    const { ctx, page, errors, hits } = await open('tablet', { app: true, query: 'boot=0', battery: { level: .87, charging: true } });
+    await page.waitForTimeout(1500);
+    ok(!(await page.$('#gauges, #dayring, #tmr, .flare, #chg')), 'none of the add-ons is drawn');
+    ok(hits.air === 0 && (await page.evaluate(() => window.__batCalls)) === 0, 'no air-quality request, no battery read');
+    await hold(page, '#clock');
+    ok(await page.isHidden('#sheet') && !(await page.evaluate(() => document.body.dataset.hol)), 'holding the clock opens nothing; no holiday colors');
+    ok((await page.textContent('#greet')) === 'GOOD EVENING, HECTOR', 'the usual greeting');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+
+  // 7. ?try=1 by day: power and air beside the clock, the sun on its ring, at every size
+  for (const view of Object.keys(VIEWS)) {
+    console.log(`\n${view}: ?try=1, 10:30, battery 87% charging, AQI 70`);
+    const { ctx, page, errors, hits } = await open(view, { app: view.startsWith('tablet'), query: 'boot=0&try=1', at: '2026-10-28T10:30:00-07:00', battery: { level: .87, charging: true } });
+    await page.waitForTimeout(1500);
+    const st = await state(page), cells = await lit(page);
+    ok(hits.air === 1 && st.air === 70, 'the air read once: AQI 70');
+    ok(cells.length === 16 && cells.slice(0, 8).filter(c => c.on).length === 7 && cells.slice(8).filter(c => c.on).length === 3, 'power: 7 of 8 cells lit; air: 3 of 8');
+    ok((await page.textContent('#pw-lab')) === '87%' && !!(await page.$('#bolt')) && (await page.textContent('#aq-lab')) === 'AQI 70', 'the labels: a bolt and 87%, AQI 70');
+    const want = -90 + 180 * 200 / 654;
+    ok(st.bead === 'sun' && Math.abs(st.day.a - want) < .5, `the sun on its ring at ${st.day.a.toFixed(1)}° (sunrise 07:10 at the left, sunset 18:04 at the right)`);
+    const near = await eyeClear(page); ok(!near.length, 'the brackets and labels clear the time and the date' + (near.length ? ': ' + near.join(', ') : ''));
+    const sweep = await beadSweep(page); ok(!sweep.length, 'the bead, all the way round, stays on screen and clear of the pods, labels, top and bottom' + (sweep.length ? ': ' + sweep.slice(0, 8).join(', ') : ''));
+    checkLayout(await page.evaluate(geometry), view + ' try');
+    await shot(page, `${view}-try-day`);
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+
+  // 8. the hour flare, then the kitchen timer from the hold to the alarm
+  {
+    console.log('\ntablet: ?try=1, the hour flare and the kitchen timer');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1', at: '2026-10-28T10:59:40-07:00', battery: { level: 1, charging: true } });
+    await page.waitForTimeout(1200);
+    await page.clock.pauseAt(new Date('2026-10-28T10:59:50-07:00'));
+    ok((await state(page)).flares === 0, 'no flare before the hour');
+    await page.clock.runFor(15000);
+    ok((await state(page)).flares === 1, 'at 11:00 the reactor flares once');
+    await page.clock.runFor(60000);
+    ok((await state(page)).flares === 1, '... and not again at 11:01');
+
+    await hold(page, '#clock');
+    ok(await page.isVisible('#sheet') && /KITCHEN TIMER/.test(await page.textContent('#sheet h2')) && (await page.$$('#sheet [data-min]')).length === 12, 'holding the clock opens the kitchen timer: 12 times to pick');
+    await shot(page, 'tablet-try-timer-sheet');
+    const b0 = await page.evaluate(() => window.__beeps);
+    await page.click('#sheet [data-min="5"]'); await page.waitForTimeout(100);
+    let st = await state(page);
+    ok(await page.isHidden('#sheet') && st.tmr && st.tmr.len === 300000, 'a 5-minute timer starts and the sheet closes');
+    ok(/^(5:00|4:59)$/.test(await page.textContent('#tm-txt')), `the reactor counts it down (${await page.textContent('#tm-txt')})`);
+    ok((await page.evaluate(() => window.__beeps)) === b0 + 1, 'one blip says it started');
+    await page.clock.runFor(150000);
+    const half = parseFloat(await page.getAttribute('#tm-arc', 'stroke-dasharray'));
+    ok(/^2:(31|30|29)$/.test(await page.textContent('#tm-txt')) && Math.abs(half - 373.85 / 2) < 4, `halfway: ${await page.textContent('#tm-txt')} left (it turns 30 ms after each second), the ring half drained`);
+    const near = await eyeClear(page); ok(!near.length, 'the countdown clears the time' + (near.length ? ': ' + near.join(', ') : ''));
+    await shot(page, 'tablet-try-timer');
+    await hold(page, '#clock');
+    ok(await page.isVisible('#tm-stop') && /RUNNING · 2:(29|30) LEFT/.test(await page.textContent('#tm-left')), 'held again while it runs: the time left, +1, +5, STOP');
+    await page.click('#sheet [data-add="1"]'); await page.waitForTimeout(100);
+    ok(/^3:(29|30)$/.test(await page.textContent('#tm-txt')), `+1 MIN: ${await page.textContent('#tm-txt')} left`);
+    const calls0 = (await page.evaluate(() => window.__calls)).length;
+    await page.clock.runFor(211000);
+    st = await state(page);
+    ok(st.tmr && st.tmr.done && st.alarm && (await page.textContent('#tm-txt')) === 'DONE' && /TIMER DONE/.test(await page.textContent('#toast')), 'at zero: DONE on the reactor, a toast, the alarm on');
+    const b1 = await page.evaluate(() => window.__beeps), f1 = st.flares;
+    await page.clock.runFor(2500);
+    ok((await page.evaluate(() => window.__beeps)) >= b1 + 3 && (await state(page)).flares > f1, 'it keeps chiming (three tones every 2.4 s) and flaring');
+    const pod = await page.locator('.pod >> nth=0').boundingBox();
+    await page.touchscreen.tap(pod.x + pod.width / 2, pod.y + pod.height / 2); await page.waitForTimeout(300);
+    st = await state(page);
+    ok(!st.tmr && !st.alarm && (await page.isHidden('#tmr')) && (await page.evaluate(() => window.__calls)).length === calls0, 'a touch, even on a pod, stops it and opens nothing');
+    await page.clock.runFor(1000);   // the stopping touch swallows the next 650 ms of touches
+    await hold(page, '#clock'); await page.click('#sheet [data-min="1"]'); await page.waitForTimeout(100);
+    await page.clock.runFor(61000 + 125000);
+    st = await state(page);
+    ok(st.tmr && st.tmr.done && !st.alarm, 'left alone, the chime stops after two minutes and DONE stays');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+
+  // 9. night: the moon in its phase on the bottom half; no flare while the screen is dimmed
+  {
+    console.log('\ntablet: ?try=1 at night');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1', at: '2026-10-28T21:58:30-07:00', battery: { level: 1, charging: true } });
+    await page.waitForTimeout(1000);
+    await page.clock.pauseAt(new Date('2026-10-28T21:58:40-07:00'));
+    let st = await state(page);
+    ok(st.bead === 'moon' && st.day.a > 90 && st.day.a < 270, `the moon rides the bottom half (${st.day.a.toFixed(1)}°)`);
+    ok((await page.getAttribute('#bead path', 'transform')) === 'scale(-1 1)', 'waning, lit on the left (the full moon was 10-26)');
+    await shot(page, 'tablet-try-night');
+    await page.clock.runFor(70000);
+    st = await state(page); ok(st.dimmed, 'a minute untouched: dimmed');
+    await page.clock.runFor(60000);
+    st = await state(page); ok(st.flares === 0, 'no flare at 22:00 while dimmed');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+
+  // 10. holidays (by date and on screen), and the battery running low, then plugged in
+  {
+    console.log("\ntablet-land: ?try=1 on New Year's Eve, the battery at 8%");
+    const { ctx, page, errors } = await open('tablet-land', { app: true, query: 'boot=0&try=1', at: '2026-12-31T10:00:00-08:00', battery: { level: .08, charging: false } });
+    await page.waitForTimeout(1500);
+    const days = await page.evaluate(() => ['2026-10-31T12:00', '2026-10-28T12:00', '2026-11-26T12:00', '2026-11-19T12:00', '2026-12-24T12:00', '2026-12-25T12:00', '2026-12-31T12:00', '2027-01-01T12:00', '2027-07-04T12:00', '2027-11-25T12:00'].map(window.hub.holiday));
+    ok(days.join() === 'halloween,,thanksgiving,,xmas,xmas,newyear,newyear,july4,thanksgiving', 'holidays by date: ' + days.join());
+    ok((await page.textContent('#greet')) === "HAPPY NEW YEAR'S EVE, HECTOR" && (await page.evaluate(() => document.body.dataset.hol)) === 'newyear', "Dec 31: HAPPY NEW YEAR'S EVE, HECTOR, and the day's colors");
+    ok(/rgba?\(255, 233, 176/.test(await page.$eval('.mote', m => getComputedStyle(m).backgroundImage)), "the dust wears the day's colors");
+    checkLayout(await page.evaluate(geometry), 'tablet-land, the longest greeting');
+    const cells = (await lit(page)).slice(0, 8);
+    ok(cells.every(c => c.c === '#FF3B30') && cells.filter(c => c.on).length === 1 && /BATTERY LOW/.test(await page.textContent('#toast')), 'at 8% and unplugged: one red cell, and a toast to plug it in');
+    await page.evaluate(() => { window.__bat.charging = true; window.__bat.dispatchEvent(new Event('chargingchange')); });
+    await page.waitForTimeout(100);
+    const st = await state(page);
+    ok(st.sparks === 1 && !!(await page.$('#bolt')) && (await lit(page)).slice(0, 8).every(c => c.c === '#FFB547'), 'plugged in: a spark runs up the bracket, the bolt shows, the cells turn gold');
+    await shot(page, 'tablet-land-try-holiday');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntablet: ?try=1&holiday=halloween, evening');
+    const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0&try=1&holiday=halloween', at: '2026-10-28T19:30:00-07:00', battery: { level: 1, charging: true } });
+    await page.waitForTimeout(2500);
+    ok((await page.textContent('#greet')) === 'HAPPY HALLOWEEN, HECTOR' && (await page.$eval('#greet', e => getComputedStyle(e).color)) === 'rgb(196, 140, 255)', 'Halloween: HAPPY HALLOWEEN, HECTOR, in purple');
+    const motes = await page.$$eval('.mote', ms => ms.map(m => m.getAnimations()[0].effect.getKeyframes().reduce((a, k) => Math.max(a, k.opacity == null ? 0 : +k.opacity), 0)));
+    ok(motes.length === 14 && Math.min(...motes) >= .6, 'the holiday dust burns brighter (every mote peaks at .6 or more)');
+    await shot(page, 'tablet-try-halloween');
+    ok(!errors.length, errs(errors));
     await ctx.close();
   }
 } finally {
