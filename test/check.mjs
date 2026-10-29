@@ -145,7 +145,7 @@ try {
     await ctx.close();
   }
 
-  // 3. in the app: a pod opens its service, the core talks, the gear opens the panel, Home does nothing
+  // 3. in the app: a pod opens its service, the core does nothing (talk is out for now), the gear opens the panel, Home (not set up) does nothing
   {
     console.log('\ntablet: app, taps');
     const { ctx, page, errors } = await open('tablet', { app: true, query: 'boot=0' });
@@ -157,9 +157,11 @@ try {
     await tapAt('.pod >> nth=2'); await page.waitForTimeout(500);
     ok(!(await page.evaluate(() => window.__calls)).some(c => c === 'open:2'), 'Home (not set up) opens nothing');
     ok(/NOT SET UP/.test(await page.textContent('#toast')), '... and says so');
-    await tapAt('#clock'); await page.waitForTimeout(500);
-    ok((await page.evaluate(() => window.__calls)).includes('talk'), 'a tap on the core asks the app to talk');
-    await page.evaluate(() => window.hub.returned(0)); await page.waitForTimeout(900);
+    const before = (await page.evaluate(() => window.__calls)).length;
+    await tapAt('#clock'); await page.waitForTimeout(600);
+    const added = (await page.evaluate(() => window.__calls)).slice(before);
+    ok(!added.length, 'a tap on the core asks the app for nothing (talk is out for now)' + (added.length ? ': ' + added.join(', ') : ''));
+    ok(!(await page.$('#talk')) && !/TAP TO TALK/.test(await page.textContent('#reactor')), 'no TAP TO TALK on the core');
     await tapAt('#gear'); await page.waitForTimeout(200);
     ok((await page.evaluate(() => window.__calls)).includes('panel'), 'the gear asks for the panel');
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
