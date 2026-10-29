@@ -2,12 +2,12 @@
 
 The desk tablet's front door: **https://hectorfsv.github.io/hub/**
 
-ARC with the Forge. A gold reactor holds the clock. The Lounge, the Pit and Home sit on its orbit. While a cook runs on
+ARC with the Forge. A gold reactor holds the clock (24-hour) and the date. The core's talk is out for now, until a better
+tablet. The Lounge, the Pit and Home sit on its orbit. While a cook runs on
 the Pit, embers rise and the bottom of the screen glows like a firebox.
 
 - **In the Hubs app on the tablet** (`window.HubsApp`):
   - a pod opens its service;
-  - the core opens the Lounge in voice mode;
   - the gear opens the app's panel;
   - after sunset, a minute untouched dims the screen. The first touch only wakes it.
 - **In any browser,** the pods are plain links.
