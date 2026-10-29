@@ -71,8 +71,8 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (bat) { window.__bat = Object.assign(new EventTarget(), { level: bat.level, charging: bat.charging, chargingTime: 0, dischargingTime: Infinity }); }
     if (bat || real) Object.defineProperty(navigator, 'getBattery', { configurable: true, value: () => { window.__batCalls++; return bat ? Promise.resolve(window.__bat) : real(); } });
     // sound: every tone the page makes is counted
-    window.__beeps = 0;
-    if (window.AudioContext) { const AC = window.AudioContext; window.AudioContext = class extends AC { createOscillator() { window.__beeps++; return super.createOscillator(); } }; }
+    window.__beeps = 0; window.__tones = [];
+    if (window.AudioContext) { const AC = window.AudioContext; window.AudioContext = class extends AC { createOscillator() { window.__beeps++; const o = super.createOscillator(), start = o.start.bind(o); o.start = t => { window.__tones.push({ type: o.type, hz: o.frequency.value }); start(t); }; return o; } }; }
     if (linked) localStorage.setItem('hub.pit', JSON.stringify({ access_token: 'a0', refresh_token: 'r0', expires_at: Date.now() + 3e6, email: 'pit@test' }));
     if (app) {
       window.__calls = [];
@@ -343,7 +343,9 @@ try {
     ok(st.tmr && st.tmr.done && st.alarm && (await page.textContent('#tm-txt')) === 'DONE' && /TIMER DONE/.test(await page.textContent('#toast')), 'at zero: DONE on the reactor, a toast, the alarm on');
     const b1 = await page.evaluate(() => window.__beeps), f1 = st.flares;
     await page.clock.runFor(2500);
-    ok((await page.evaluate(() => window.__beeps)) >= b1 + 3 && (await state(page)).flares > f1, 'it keeps chiming (three tones every 2.4 s) and flaring');
+    ok((await page.evaluate(() => window.__beeps)) >= b1 + 4 && (await state(page)).flares > f1, 'it keeps chiming (four beeps every 2.4 s) and flaring');
+    const alarmTones = (await page.evaluate(() => window.__tones)).slice(-4);
+    ok(alarmTones.length === 4 && alarmTones.every(t => t.type === 'square' && t.hz === 2700), "the alarm's beeps are square waves at 2.7 kHz (loud on a tablet's speaker), not soft sines");
     const pod = await page.locator('.pod >> nth=0').boundingBox();
     await page.touchscreen.tap(pod.x + pod.width / 2, pod.y + pod.height / 2); await page.waitForTimeout(300);
     st = await state(page);

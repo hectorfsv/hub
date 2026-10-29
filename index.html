@@ -1081,7 +1081,7 @@ function alarm() {
   if (!S.alarm || !S.tmr) return;
   if (Date.now() - S.tmr.doneAt > 120e3) { S.alarm = false; T.alarm = setTimeout(stopTimer, 28 * MIN); return; }   // then DONE waits half an hour
   if (!doc.hidden) hourFlare();
-  beep(3, 1046.5);
+  chime();
   T.alarm = setTimeout(alarm, 2400);
 }
 // sound: a touch is the browser's permission, so the tap that starts a timer opens it
@@ -1097,6 +1097,20 @@ function beep(n, hz, vol = .32) {
     o.type = 'sine'; o.frequency.value = hz;
     g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + .16);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + .18);
+  }
+}
+// the alarm: a kitchen timer's beep-beep-beep-beep. Square waves at 2.7 kHz (a tablet speaker's loud band, and the ear's
+// keenest), held near full scale. The first alarm, soft sines at 1 kHz fading in 0.16 s, "barely sounds" with the
+// tablet's media volume at 15 of 15 (his word 10-29)
+function chime() {
+  const c = SND.ctx; if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  const t0 = c.currentTime + .03;
+  for (let k = 0; k < 4; k++) {
+    const t = t0 + k * .2, o = c.createOscillator(), g = c.createGain();
+    o.type = 'square'; o.frequency.value = 2700;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.8, t + .004); g.gain.setValueAtTime(.8, t + .125); g.gain.linearRampToValueAtTime(0, t + .135);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + .14);
   }
 }
 
@@ -1125,7 +1139,7 @@ window.hub = {
   demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
 
-Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare });
+Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare, chime() { audioOn(); chime(); } });
 
 // ---- start ----
 if (APP) body.classList.add('app');
