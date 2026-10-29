@@ -657,7 +657,7 @@ function shapeCook(row, rd) {
 async function pitPoll() {
   clearTimeout(pitPoll.t);
   if (S.pitIx >= 0) {
-    if (DEMO === 'cook') { S.cook = demoCook(); S.pit = 'cook'; }
+    if (DEMO === 'cook' || S.demoCook) { S.cook = demoCook(); S.pit = 'cook'; }
     else if (!pitConfig()) S.pit = 'none';
     else if (!pitSession()) { S.pit = 'unlinked'; S.cook = null; }
     else try {
@@ -861,7 +861,7 @@ window.hub = {
   returned,
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
   state() { return JSON.stringify({ booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() }); },
-  demo(kind) { if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
+  demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
 
 // ---- start ----
