@@ -139,6 +139,9 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 /* ---- the pods ---- */
 #pods{position:absolute;inset:0;z-index:4;pointer-events:none}
 .pod{position:absolute;pointer-events:auto;cursor:pointer;outline:none;transition:transform .14s ease,opacity 1.2s ease}
+/* a remote or a keyboard (the Fire TV Stick, 10-29): the chosen pod wears a gold ring; a finger never shows it */
+.pod:focus-visible::after{content:'';position:absolute;inset:-9%;border-radius:50%;box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75);pointer-events:none}
+#gear:focus-visible,#sheet button:focus-visible{outline:2px solid var(--gold-hot);outline-offset:4px}
 .pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pod .glow{inset:-48%;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.08) 38%,transparent 64%);will-change:opacity;animation:breathe 4.6s ease-in-out infinite alternate}
 .pod .orb{inset:-15%;will-change:transform;animation:rot 28s linear infinite}
