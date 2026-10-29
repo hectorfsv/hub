@@ -76,7 +76,9 @@ Hubs 2.1 says `tv: true` in its services and hands the stick's arrows and Select
 and Enter. The page then moves a gold ring (`.cur`) by direction over the pods, LINK LIVE COOKS, the clock and the gear;
 inside a sheet, over that sheet's buttons and fields. Select presses; on the clock it opens the kitchen timer (the hold);
 Back closes a sheet (the app sends Escape) and the ring returns to where it was. The page lays out at 1443x812 there
-(the app's wide viewport). A finger never sees the ring; a keyboard's focus wears the same one.
+(the app's wide viewport). A finger never sees the ring; a keyboard's focus wears the same one. **The stick's layer
+diet:** on a TV the 1-px scan line, the three orbit runners and 8 of the 14 motes stay out (`.tv` rules): on that chip
+every composited layer costs CPU every frame (measured 10-29, `projects/desk-tablet/README.md`); the tablet keeps them all.
 
 ## Tests
 
