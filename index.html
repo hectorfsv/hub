@@ -144,6 +144,9 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 #gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur{outline:2px solid var(--gold-hot);outline-offset:4px}
 #clock.cur .time{text-shadow:0 0 14px var(--gold-hot),0 0 44px var(--gold)}
 .tv *:focus{outline:none}
+/* the stick's layer diet (10-29, measured: every composited layer costs its chip per frame; 63 layers = 1.9 cores): on a TV the 1-px
+   scan line, the three orbit runners and 8 of the 14 motes stay out; the rings, the orbs, the glows and the clock keep moving */
+.tv #scan,.tv .runner,.tv .mote:nth-child(n+7){display:none}
 .pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pod .glow{inset:-48%;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.08) 38%,transparent 64%);will-change:opacity;animation:breathe 4.6s ease-in-out infinite alternate}
 .pod .orb{inset:-15%;will-change:transform;animation:rot 28s linear infinite}
