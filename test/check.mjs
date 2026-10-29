@@ -37,6 +37,7 @@ const VIEWS = {
   'tablet-land': { viewport: { width: 853, height: 533 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true },
   iphone: { viewport: { width: 440, height: 956 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
   desktop: { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
+  tv: { viewport: { width: 1443, height: 812 }, deviceScaleFactor: 1 },   // the Fire TV Stick: 1080p at the app's wide viewport
 };
 const COOK = [{ id: 7, meat: 'Brisket', status: 'running', started_at: new Date(T0 - 372 * 60e3).toISOString(),
   state: { phase: 'cook', probes: { brisket: 'p0' }, plan: { name: 'Monclova low n slow', probes: ['brisket'], tracks: { brisket: [{ until: { at_least: 203 } }] } } } }];
@@ -46,7 +47,7 @@ let failures = 0;
 const ok = (cond, what) => { if (cond) console.log('  ok  ', what); else { failures++; console.log('  FAIL', what); } };
 
 const browser = await chromium.launch({ executablePath: SHELL });
-async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null } = {}) {
+async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null, tv = false } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date(at) });
@@ -64,7 +65,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(READING) });
     return r.fulfill({ status: 404, body: '' });
   });
-  await page.addInitScript(([app, linked, bat]) => {
+  await page.addInitScript(([app, linked, bat, tv]) => {
     // the battery: a stand-in the test can plug in and out; every read is counted
     window.__batCalls = 0;
     const real = navigator.getBattery && navigator.getBattery.bind(navigator);
@@ -77,14 +78,14 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (app) {
       window.__calls = [];
       window.HubsApp = {
-        services: () => JSON.stringify({ version: '2.0', services: [
+        services: () => JSON.stringify({ version: '2.0', tv, services: [
           { name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true },
           { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
           { name: 'Home Assistant', url: '', mic: false }] }),
         open: i => window.__calls.push('open:' + i), talk: () => window.__calls.push('talk'), panel: () => window.__calls.push('panel'), dim: on => window.__calls.push('dim:' + on),
       };
     }
-  }, [app, linked, battery]);
+  }, [app, linked, battery, tv]);
   await page.goto(BASE + (query ? '?' + query : ''));
   return { ctx, page, errors, pit, hits };
 }
@@ -407,6 +408,53 @@ try {
     ok(motes.length === 14 && Math.min(...motes) >= .6, 'the holiday dust burns brighter (every mote peaks at .6 or more)');
     await shot(page, 'tablet-try-halloween');
     ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+
+  // 11. a TV (the Fire TV Stick, 10-29): the arrows move the ring by direction, Select presses, the clock is the timer
+  {
+    console.log('\ntv: app, the remote');
+    const { ctx, page, errors } = await open('tv', { app: true, tv: true, query: 'boot=0' });
+    await page.waitForTimeout(1500);
+    const cur = sel => page.$eval(sel, e => e.classList.contains('cur'));
+    ok(await page.$eval('body', b => b.classList.contains('tv')), 'the page knows it is on a TV');
+    ok(await cur('.pod.pit'), 'the ring starts on the Pit');
+    await page.keyboard.press('ArrowUp');
+    ok(await cur('.pod'), 'Up: the Lounge');
+    await page.keyboard.press('ArrowDown');
+    ok(await cur('.pod.pit'), 'Down: the Pit again');
+    await page.keyboard.press('ArrowDown');
+    ok(await cur('#chip1'), "Down: LINK LIVE COOKS (Home Assistant, not set up, is skipped)");
+    await page.keyboard.press('ArrowDown');
+    ok(await cur('#gear'), 'Down: the gear');
+    await page.keyboard.press('Enter');
+    ok((await page.evaluate(() => window.__calls)).includes('panel'), 'Select on the gear asks the app for the panel');
+    await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
+    ok(await cur('.pod.pit'), 'Up, Up: the chip, then the Pit');
+    await page.keyboard.press('ArrowLeft');
+    ok(await cur('#clock'), 'Left: the clock');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+    ok(await page.$eval('#sheet', f => !f.hidden && /KITCHEN TIMER/.test(f.textContent)) && await cur('#sheet [data-min="1"]'), 'Select on the clock: the kitchen timer, the ring on 1 MIN');
+    await page.keyboard.press('ArrowRight');
+    ok(await cur('#sheet [data-min="3"]'), 'Right inside the sheet: 3 MIN');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok(await page.$eval('#sheet', f => f.hidden) && await cur('#clock'), 'Back closes the sheet; the ring is back on the clock');
+    await page.keyboard.press('ArrowRight');
+    ok(await cur('.pod.pit'), 'Right: the Pit');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Select on the Pit opens it in the app');
+    await shot(page, 'tv-remote');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open('tablet', { app: true, query: 'boot=0' });
+    await page.waitForTimeout(800);
+    await page.keyboard.press('ArrowDown');
+    ok(!(await page.$('.cur')), 'the tablet, no TV: the arrows ring nothing');
     await ctx.close();
   }
 } finally {

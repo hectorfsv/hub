@@ -139,9 +139,11 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 /* ---- the pods ---- */
 #pods{position:absolute;inset:0;z-index:4;pointer-events:none}
 .pod{position:absolute;pointer-events:auto;cursor:pointer;outline:none;transition:transform .14s ease,opacity 1.2s ease}
-/* a remote or a keyboard (the Fire TV Stick, 10-29): the chosen pod wears a gold ring; a finger never shows it */
-.pod:focus-visible::after{content:'';position:absolute;inset:-9%;border-radius:50%;box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75);pointer-events:none}
-#gear:focus-visible,#sheet button:focus-visible{outline:2px solid var(--gold-hot);outline-offset:4px}
+/* a remote (the Fire TV Stick, 10-29): the arrows move a gold ring, the cursor (.cur); a keyboard's focus wears the same; a finger never sees either */
+.pod:focus-visible::after,.pod.cur::after{content:'';position:absolute;inset:-9%;border-radius:50%;box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75);pointer-events:none}
+#gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur{outline:2px solid var(--gold-hot);outline-offset:4px}
+#clock.cur .time{text-shadow:0 0 14px var(--gold-hot),0 0 44px var(--gold)}
+.tv *:focus{outline:none}
 .pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pod .glow{inset:-48%;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.08) 38%,transparent 64%);will-change:opacity;animation:breathe 4.6s ease-in-out infinite alternate}
 .pod .orb{inset:-15%;will-change:transform;animation:rot 28s linear infinite}
@@ -330,7 +332,8 @@ function toast(msg, ms) {
 // ---- the services: the app's Setup decides them; a browser gets the defaults ----
 function loadServices() {
   let list = null;
-  if (APP) try { const j = JSON.parse(APP.services()); list = j.services; S.version = j.version; } catch (e) { /* defaults */ }
+  if (APP) try { const j = JSON.parse(APP.services()); list = j.services; S.version = j.version; S.tv = !!j.tv; } catch (e) { /* defaults */ }
+  body.classList.toggle('tv', !!S.tv);
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
     return { i, name: String(s.name || DEFAULTS[i].name), url: String(s.url || ''), mic: !!s.mic };
@@ -1150,9 +1153,66 @@ window.hub = {
 
 Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare, chime() { audioOn(); chime(); } });
 
+// ---- a remote (the Fire TV Stick, 10-29): the arrows move a gold ring by direction, Select presses, the clock is the timer ----
+// The app says `tv` in its services and hands the stick's arrows and Select to this page as ArrowLeft/Right/Up/Down and Enter.
+// The ring walks the pods, the link chip, the clock and the gear; inside a sheet, that sheet's buttons and fields.
+const TV = {
+  cur: null, back: null,
+  targets() {
+    const shown = e => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    if (S.sheet) return [...$('sheet').querySelectorAll('button:not([disabled]),input')].filter(shown);
+    return [...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'), $('gear')].filter(shown);
+  },
+  ring(el) {
+    if (TV.cur) TV.cur.classList.remove('cur');
+    TV.cur = el || null;
+    if (!el) return;
+    el.classList.add('cur');
+    if (el.tagName === 'INPUT') el.focus(); else if (doc.activeElement && doc.activeElement.tagName === 'INPUT') doc.activeElement.blur();
+  },
+  home() { const t = TV.targets(); TV.ring(t.find(e => e.classList.contains('pit')) || t[0] || null); },
+  move(dx, dy) {
+    const t = TV.targets(); if (!t.length) return;
+    if (!TV.cur || !t.includes(TV.cur)) { TV.settle(0); return; }
+    const c = TV.mid(TV.cur); let best = null, score = Infinity;
+    for (const e of t) {
+      if (e === TV.cur) continue;
+      const m = TV.mid(e), vx = m.x - c.x, vy = m.y - c.y, along = vx * dx + vy * dy;
+      if (along <= 8) continue;                              // not in the arrow's direction
+      const s = along + Math.abs(vx * dy - vy * dx) * 2.2;    // the nearer, and the closer to the arrow's line, the better
+      if (s < score) { score = s; best = e; }
+    }
+    if (best) TV.ring(best);
+  },
+  press() {
+    const t = TV.targets(), e = TV.cur;
+    if (!e || !t.includes(e)) { TV.settle(0); return; }
+    if (!S.sheet) TV.back = e;                                // where to return when a sheet closes
+    if (e === $('clock')) openTimer(); else if (e.tagName === 'INPUT') { e.focus(); return; } else e.click();
+    TV.settle(80);
+  },
+  /** After a press or Back: a sheet may have opened or closed; the ring lands on the right thing. */
+  settle(ms) {
+    setTimeout(() => {
+      const t = TV.targets();
+      if (TV.cur && t.includes(TV.cur)) return;
+      TV.ring(t.includes(TV.back) ? TV.back : t.find(e => e.classList.contains('pit')) || t[0] || null);
+    }, ms);
+  },
+  mid(e) { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+};
+doc.addEventListener('keydown', e => {
+  if (!S.tv) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (d) { e.preventDefault(); wake(); TV.move(d[0], d[1]); }
+  else if (e.key === 'Enter') { if (e.target && e.target.tagName === 'INPUT') return; e.preventDefault(); wake(); TV.press(); }
+  else if (e.key === 'Escape') TV.settle(80);                 // the sheet's own Escape handler closed it
+});
+
 // ---- start ----
 if (APP) body.classList.add('app');
 loadServices(); drawRings(); buildPods(); layout(true);
+if (S.tv) TV.home();
 addOns();
 S.wx = store.get('hub.wx'); renderWx(); tick(); motes();
 setInterval(idleTick, 5000);
