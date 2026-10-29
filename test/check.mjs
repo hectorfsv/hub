@@ -117,7 +117,7 @@ try {
     ok(st.booted, 'boot ran and finished');
     ok(st.wx, 'weather read');
     ok(await page.$$eval('#hours .h', h => h.length) === 6, 'six hours ahead');
-    ok(/^\d{1,2}:\d{2}(AM|PM)$/.test((await page.textContent('#time')).replace(/\s/g, '')), 'the clock reads h:mm AM/PM');
+    ok(/^\d{2}:\d{2}$/.test(await page.textContent('#time')), 'the clock reads HH:MM (24-hour, his setting)');
     ok(await page.isVisible('#chip1'), "the Pit offers 'LINK LIVE COOKS'");
     ok(st.reach[0] === 'on' && st.reach[1] === 'on' && st.reach[2] === 'unset', 'each service checked (Home not set up)');
     checkLayout(await page.evaluate(geometry), view);
