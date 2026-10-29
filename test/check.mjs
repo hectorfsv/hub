@@ -329,8 +329,8 @@ try {
     ok(/^(5:00|4:59)$/.test(await page.textContent('#tm-txt')), `the reactor counts it down (${await page.textContent('#tm-txt')})`);
     ok((await page.evaluate(() => window.__beeps)) === b0 + 1, 'one blip says it started');
     await page.clock.runFor(150000);
-    const half = parseFloat(await page.getAttribute('#tm-arc', 'stroke-dasharray'));
-    ok(/^2:(31|30|29)$/.test(await page.textContent('#tm-txt')) && Math.abs(half - 373.85 / 2) < 4, `halfway: ${await page.textContent('#tm-txt')} left (it turns 30 ms after each second), the ring half drained`);
+    const half = await page.$$eval('#tm-cells path', ps => ps.filter(p => p.getAttribute('opacity') === '1').length);
+    ok(/^2:(31|30|29)$/.test(await page.textContent('#tm-txt')) && Math.abs(half - 30) <= 1, `halfway: ${await page.textContent('#tm-txt')} left (it turns 30 ms after each second), ${half} of the ring's 60 cells lit`);
     const near = await eyeClear(page); ok(!near.length, 'the countdown clears the time' + (near.length ? ': ' + near.join(', ') : ''));
     await shot(page, 'tablet-try-timer');
     await hold(page, '#clock');
@@ -350,6 +350,7 @@ try {
     await page.touchscreen.tap(pod.x + pod.width / 2, pod.y + pod.height / 2); await page.waitForTimeout(300);
     st = await state(page);
     ok(!st.tmr && !st.alarm && (await page.isHidden('#tmr')) && (await page.evaluate(() => window.__calls)).length === calls0, 'a touch, even on a pod, stops it and opens nothing');
+    ok((await page.$$eval('#tm-cells path', ps => ps.filter(p => p.getAttribute('opacity') === '1').length)) === 0, "stopped: the ring's cells all go dark for the next timer");
     await page.clock.runFor(1000);   // the stopping touch swallows the next 650 ms of touches
     await hold(page, '#clock'); await page.click('#sheet [data-min="1"]'); await page.waitForTimeout(100);
     await page.clock.runFor(61000 + 125000);

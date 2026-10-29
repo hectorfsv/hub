@@ -896,9 +896,13 @@ function addOns() {
   const r = $('reactor');
   r.querySelector('.halo.hot').insertAdjacentHTML('afterend', '<div class="flare" aria-hidden="true"></div>');
   $('ring-static').insertAdjacentHTML('beforeend', '<g id="bead"></g>');
+  // the timer's ring is 60 cells, so each step redraws one small cell: a whole drained arc redrew the core's circle every
+  // second (15 late frames in 500 on the tablet, 10-29)
+  let cells = '';
+  for (let k = 0; k < 60; k++) { const [x0, y0] = P(59.5, k * 6 + .9), [x1, y1] = P(59.5, k * 6 + 5.1); cells += `<path d="M${x0} ${y0}A59.5 59.5 0 0 1 ${x1} ${y1}" opacity="0"/>`; }
   r.querySelector('.core').innerHTML = '<svg viewBox="-62 -62 124 124" id="gauges" aria-hidden="true"></svg>'
     + '<svg viewBox="-62 -62 124 124" id="tmr" aria-hidden="true"><circle r="59.5" fill="none" stroke="#FFB547" stroke-width="1.2" opacity=".16"/>'
-    + '<circle id="tm-arc" r="59.5" fill="none" stroke="#FFC46B" stroke-width="2" stroke-linecap="round" transform="rotate(-90)" stroke-dasharray="0 999"/><text id="tm-txt" y="-39" text-anchor="middle"></text></svg>';
+    + `<g id="tm-cells" fill="none" stroke="#FFC46B" stroke-width="2">${cells}</g><text id="tm-txt" y="-39" text-anchor="middle"></text></svg>`;
   $('sec').insertAdjacentHTML('afterend', '<div id="chg" aria-hidden="true"><i></i></div>');
   S.air = store.get('hub.air');
   power(); air(true); renderGauges();
@@ -1055,6 +1059,7 @@ function addTimer(ms) {
 }
 function stopTimer() {
   S.tmr = null; S.alarm = false; store.del('hub.timer');
+  if ($('tm-cells')) { [...$('tm-cells').children].forEach(c => c.setAttribute('opacity', 0)); T.lit = 0; }
   clearTimeout(T.alarm); renderTimer();
 }
 function renderTimer() {
@@ -1065,7 +1070,8 @@ function renderTimer() {
   if (!t) return;
   const left = t.end - Date.now();
   if (!t.done && left <= 0) { timerDone(); return; }
-  $('tm-arc').setAttribute('stroke-dasharray', `${((t.done ? 1 : clamp(left / t.len, 0, 1)) * 373.85).toFixed(1)} 999`);
+  const lit = t.done ? 60 : Math.ceil(clamp(left / t.len, 0, 1) * 60), cs = $('tm-cells').children;
+  if (lit !== T.lit) { for (let k = Math.min(lit, T.lit || 0); k < Math.max(lit, T.lit || 0); k++) cs[k].setAttribute('opacity', k < lit ? 1 : 0); T.lit = lit; }
   $('tm-txt').textContent = t.done ? 'DONE' : clockLeft(left);
   const lf = $('tm-left'); if (lf) lf.textContent = t.done ? 'DONE' : `RUNNING · ${clockLeft(left)} LEFT`;
   if (!t.done) T.t = setTimeout(renderTimer, doc.hidden ? left + 30 : (left - 1) % 1000 + 30);   // hidden: one wake-up, at zero
