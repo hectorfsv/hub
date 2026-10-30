@@ -588,110 +588,149 @@ async function otherSize(view) {
 }
 
 // the tablet as the controller (10-30, his ask): the HUB drawn as on the TV (served by the stick at /hub?ctl), every touch to the TV
-async function controller() {
-  console.log(`\n${engineName} controller: the HUB on the tablet, driving the TV`);
+// the controller (10-30, his ask): the TV's clock and rings with the remote's keys set in them, sideways and upright
+async function ctlGeometry(page, name) {
+  const m = await page.evaluate(() => {
+    const r = e => { const b = e.getBoundingClientRect(); return { id: e.dataset.k || e.id || e.className, l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+    const discs = [...document.querySelectorAll('.kp,.pod,.tapp')].map(r);
+    const caps = [...document.querySelectorAll('.kp .cap,.label')].map(r);
+    const R = document.getElementById('reactor').getBoundingClientRect();
+    const sys = [...discs, ...caps, r(document.getElementById('reactor'))].reduce((a, x) => ({ l: Math.min(a.l, x.l), t: Math.min(a.t, x.t), r: Math.max(a.r, x.r), b: Math.max(a.b, x.b) }), { l: 1e9, t: 1e9, r: -1e9, b: -1e9 });
+    const panel = [...document.querySelectorAll('#tvcol>*:not([hidden]),#hours,#top .greet')].filter(e => e.getClientRects().length && getComputedStyle(e).display !== 'none').map(r);
+    return { W: innerWidth, H: innerHeight, sw: document.documentElement.scrollWidth, land: document.body.classList.contains('land'), discs, caps, sys, panel,
+      ring: { x: R.left + R.width / 2, y: R.top + R.height / 2, R: R.width / 2 } };
+  });
+  ok(m.sw <= m.W, `${name}: no sideways overflow (${m.sw} in ${m.W})`);
+  const off = [...m.discs, ...m.caps].filter(d => d.l < -1 || d.t < -1 || d.r > m.W + 1 || d.b > m.H + 1);
+  ok(!off.length, `${name}: every key, pod, app and label on screen` + (off.length ? ': ' + off.map(d => d.id).join(', ') : ''));
+  const lap = [];   // discs are round: centers closer than the radii
+  m.discs.forEach((a, i) => m.discs.slice(i + 1).forEach(b => {
+    const ra = (a.r - a.l) / 2, rb = (b.r - b.l) / 2, d = Math.hypot((a.l + a.r - b.l - b.r) / 2, (a.t + a.b - b.t - b.b) / 2);
+    if (d < ra + rb - 1) lap.push(a.id + '/' + b.id);
+  }));
+  ok(!lap.length, `${name}: no key, pod or app covers another (${m.discs.length})` + (lap.length ? ': ' + lap.join(', ') : ''));
+  const inRing = m.discs.filter(d => Math.hypot((d.l + d.r) / 2 - m.ring.x, (d.t + d.b) / 2 - m.ring.y) < m.ring.R + (d.r - d.l) / 2 - 1);
+  ok(!inRing.length, `${name}: nothing sits on the clock's ring` + (inRing.length ? ': ' + inRing.map(d => d.id).join(', ') : ''));
+  const glass = (m.land ? 1280 : 800) / m.W, small = m.discs.filter(d => /^(wake|sleep|mute|volup|voldown|menu|home|back)$/.test(d.id) && (d.r - d.l) * glass < 80);
+  ok(!small.length, `${name}: the keys at least 80 px on the glass (${Math.round((m.discs.find(d => d.id === 'home').r - m.discs.find(d => d.id === 'home').l) * glass)})` + (small.length ? ': ' + small.map(d => d.id).join(', ') : ''));
+  const hit = m.panel.filter(p => m.land ? p.l < m.sys.r - 1 : p.id === 'greet' ? p.b > m.sys.t + 1 : p.t < m.sys.b - 1);   // upright the greeting tops the page
+  ok(!hit.length, `${name}: the panel clear of the rings (${m.land ? 'to the right' : 'below'})` + (hit.length ? ': ' + hit.map(p => p.id).join(', ') : ''));
+  return m;
+}
+async function controller(view) {
+  const land = view === 'tablet-land';
+  console.log(`\n${engineName} controller (${land ? 'sideways' : 'upright'}): the HUB's rings with the remote's keys in them`);
   mock.reset();
-  const { ctx, page, errors } = await open('tablet-land', { at: '/hub', query: 'ctl&boot=0&dim=6000&k=' + TOKEN, app: true, lane: true });
+  const { ctx, page, errors } = await open(view, { at: '/hub', query: 'ctl&boot=0&dim=' + (land ? 6000 : 600000) + '&k=' + TOKEN, app: true, lane: true });
   try {
     await page.evaluate(() => { window.__lane.state = 'ok'; });
-    const c = () => page.evaluate(() => window.hub.ctl());
     ok(await until(page, () => window.hub && window.hub.ctl && window.hub.ctl().link === 'ok' && window.hub.ctl().apps > 0, 8000), 'linked to the stick, the ring holds the stick\'s apps');
-    const geo = await page.evaluate(() => ({ W: innerWidth, H: innerHeight, sw: document.documentElement.scrollWidth, cls: document.body.className, url: location.href, k: localStorage.getItem('hubs.remote.k') }));
-    ok(engineName === 'webkit' || geo.W === 1443, `the TV's own width: ${geo.W} CSS px (1443 on the TV)`);
+    const geo = await page.evaluate(() => ({ W: innerWidth, cls: document.body.className, url: location.href, k: localStorage.getItem('hubs.remote.k') }));
+    ok(geo.W === (land ? 1443 : 812), `the width: ${geo.W} CSS px (${land ? 'the TV\'s 1443 sideways' : '812 upright, the TV\'s type readable'})`);
     ok(/\bctl\b/.test(geo.cls) && /\btv\b/.test(geo.cls), 'the TV\'s layout, in controller mode');
     ok(!/k=/.test(geo.url) && geo.k === TOKEN, 'the key left the address and is kept where the remote keeps it');
-    ok(geo.sw <= geo.W, `no sideways overflow (${geo.sw} in ${geo.W})`);
     ok(await until(page, () => !document.body.classList.contains('landing') && !document.getElementById('boot'), 5000), 'the boot is over');
-    ok(await page.evaluate(() => document.getElementById('c-chip').hidden), 'an idle key link shows no chip (only a refused press does)');
     await sleep(300);
-    await shot(page, 'ctl-tablet-land');
-    const shown = await page.evaluate(() => [...document.querySelectorAll('.pod,.label')].map(e => { const b = e.getBoundingClientRect(), cs = getComputedStyle(e); return (e.id || e.className) + ':' + (b.width > 10 && +cs.opacity > .05 ? 'on' : 'OFF'); }));
-    ok(shown.every(x => x.endsWith(':on')), `every pod and its label drawn (${shown.join(' ')})`);
-    const boxes = await page.evaluate(() => {
-      const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
-      const bar = r(document.getElementById('ctl'));
-      const hub = [...document.querySelectorAll('#reactor,.pod,.label,.tapp,#tvcol,#yt-ch .ch,#foot')].filter(e => e.getClientRects().length).map(e => ({ id: e.id || e.className, ...r(e) }));
-      const keys = [...document.querySelectorAll('#ctl .ck')].map(e => ({ k: e.dataset.k || e.id, ...r(e) }));
-      return { bar, over: hub.filter(h => h.b > bar.t + 1).map(h => h.id), keys, vh: innerHeight, vw: innerWidth };
-    });
-    ok(boxes.bar.b <= boxes.vh + 1 && boxes.bar.t >= boxes.vh - 100, `the key bar sits at the bottom (${Math.round(boxes.bar.t)}-${Math.round(boxes.bar.b)} of ${boxes.vh})`);
-    ok(!boxes.over.length, 'nothing of the HUB reaches into the bar' + (boxes.over.length ? ': ' + boxes.over.join(', ') : ''));
-    ok(boxes.keys.every(k => k.r <= boxes.vw + 1 && k.l >= -1 && (k.r - k.l) * (1280 / boxes.vw) >= 64), `every key on screen and at least 64 px wide on the glass (${boxes.keys.length} keys)`);
-    ok(await page.locator('#c-now').textContent() === 'NETFLIX' && await page.locator('#c-vol').textContent() === 'VOL 15', 'NOW ON TV: NETFLIX, VOL 15');
+    await shot(page, 'ctl-' + view);
+    await ctlGeometry(page, land ? 'sideways' : 'upright');
+    ok(await page.evaluate(() => !document.querySelector('#yt-scr').getClientRects().length && !document.querySelector('#yt-ch').getClientRects().length), 'no screen square, no chip row: the channels are a section');
+    ok(await page.evaluate(() => getComputedStyle(document.getElementById('news')).display !== 'none') === land, land ? 'the news, sideways' : 'no news upright (his word)');
+    ok(await page.locator('#c-now').textContent() === 'NETFLIX' && await page.locator('#kv-n').textContent() === '15', 'the clock says NETFLIX, the volume pod 15');
+    ok(await page.evaluate(() => document.getElementById('c-chip').hidden), 'an idle key link shows no chip (only a refused press does)');
 
-    // the clock is the arrows and OK
+    // the clock is OK, its ring the arrows
     const g = await page.evaluate(() => { const b = document.getElementById('reactor').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, R: b.width / 2 }; });
     const pr = () => page.evaluate(() => window.__lane.presses.slice());
     let n0 = (await pr()).length;
     await page.touchscreen.tap(g.cx, g.cy);
-    await page.touchscreen.tap(g.cx + g.R * .8, g.cy);
-    await page.touchscreen.tap(g.cx, g.cy - g.R * .8);
-    ok(await until(page, n => window.__lane.presses.length >= n + 3, 1500, n0) && (await pr()).slice(n0).join(' ') === 'select×1 right×1 up×1', `a tap: the middle is OK, a side its arrow (${(await pr()).slice(n0).join(' ')})`);
+    await page.touchscreen.tap(g.cx + g.R * .78, g.cy);
+    await page.touchscreen.tap(g.cx, g.cy - g.R * .78);
+    ok(await until(page, n => window.__lane.presses.length >= n + 3, 1500, n0) && (await pr()).slice(n0).join(' ') === 'select×1 right×1 up×1', `a tap: the face is OK, the ring's side its arrow (${(await pr()).slice(n0).join(' ')})`);
+    ok(await page.evaluate(() => document.getElementById('arrows').querySelectorAll('.cv').length === 4), 'four arrows set in the ring');
     n0 = (await pr()).length;
-    const cdp = engineName === 'chromium' ? await ctx.newCDPSession(page) : null;
-    if (cdp) {
-      const tp = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
-      await tp('touchStart', g.cx + 40, g.cy);
-      for (let k = 1; k <= 10; k++) { await tp('touchMove', g.cx + 40 - k * 20, g.cy + k); await sleep(16); }
-      await tp('touchEnd');
-      await sleep(250);
-      const got = (await pr()).slice(n0), lefts = got.filter(p => p.startsWith('left')).reduce((s, p) => s + +p.split('×')[1], 0);
-      ok(lefts === 3 && got.every(p => p.startsWith('left')), `a swipe of 200 px left walks 3 lefts and nothing else (${got.join(' ')})`);
-    }
+    const cdp = await ctx.newCDPSession(page);
+    const tp = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    await tp('touchStart', g.cx + 40, g.cy);
+    for (let k = 1; k <= 10; k++) { await tp('touchMove', g.cx + 40 - k * 20, g.cy + k); await sleep(16); }
+    await tp('touchEnd');
+    await sleep(250);
+    let got = (await pr()).slice(n0);
+    const lefts = got.filter(p => p.startsWith('left')).reduce((s, p) => s + +p.split('×')[1], 0);
+    ok(lefts === 3 && got.every(p => p.startsWith('left')), `a swipe of 200 px left walks 3 lefts and nothing else (${got.join(' ')})`);
 
-    // the ring, the pods, the channels
+    // the keys in the rings
+    n0 = (await pr()).length;
+    for (const k of ['back', 'volup', 'mute', 'menu', 'rewind', 'playpause', 'forward', 'voldown']) await page.locator(`.kp[data-k="${k}"]`).tap();
+    ok(await until(page, n => window.__lane.presses.length >= n + 8, 2000, n0) && (await pr()).slice(n0).join(' ') === 'back×1 volup×1 mute×1 menu×1 rewind×1 playpause×1 forward×1 voldown×1', `the ring's keys go through the tablet's key lane (${(await pr()).slice(n0).join(' ')})`);
+    await page.locator('.kp[data-k="home"]').tap();
+    ok(await mock.waitFor(() => mock.keys('home') === 1, 1500), 'HUB goes to the stick itself');
+    ok(await until(page, () => document.getElementById('c-now').textContent === 'THE HUB', 1500), 'and the clock follows: THE HUB');
+    mock.setVol({ l: 0, mute: true });
+    ok(await until(page, () => document.getElementById('kv-n').textContent === '×' && document.getElementById('kv-c').textContent === 'MUTED' && document.querySelector('.kp[data-k="mute"]').classList.contains('lit'), 1500), 'muted on the stick: the volume pod says MUTED, the mute key lit');
+    mock.setVol({ l: 9, mute: false });
+    ok(await until(page, () => document.getElementById('kv-n').textContent === '9' && !document.querySelector('.kp[data-k="mute"]').classList.contains('lit'), 1500), 'VOL 9');
+
+    // the ring's apps and the pods
     let from = mock.calls.length;
     await page.locator('.tapp').nth(1).tap();
-    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/launch' && c.delivered && c.body.pkg === mock.apps[1].pkg), 1500), 'an app on the ring opens on the TV (/api/launch)');
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/launch' && c.delivered && c.body.pkg === mock.apps[1].pkg), 1500), 'an app in the crown opens on the TV (/api/launch)');
     from = mock.calls.length;
     await page.locator('.pod.pit').tap();
     ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.delivered && c.body.do === 'open' && c.body.i === 1), 1500), 'The Pit\'s pod opens The Pit on the TV (/api/hub open 1)');
-    from = mock.calls.length;
-    await page.locator('#yt-ch .ch[data-k="cnn"]').tap();
-    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt' && c.body.k === 'cnn'), 1500), 'a channel plays on the TV\'s tile (/api/hub yt cnn)');
-    ok(await until(page, () => /PLAYING ON THE TV/.test(document.getElementById('yt-hint').textContent) && document.querySelector('#yt-ch .ch.on') && !document.querySelector('#yt-scr iframe'), 1500), 'the tile here says PLAYING ON THE TV, and plays nothing itself');
-    await page.locator('#yt-scr').tap();
-    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-full' && c.body.on === true), 1500), 'a tap on the tile: full screen on the TV');
-    await page.locator('#yt-ch .ch[data-k="cnn"]').tap();
-    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-stop'), 1500), 'the same channel again stops it');
 
-    // the bar
-    n0 = (await pr()).length; from = mock.calls.length;
-    await page.locator('#ctl [data-k="back"]').tap(); await page.locator('#ctl [data-k="volup"]').tap(); await page.locator('#ctl [data-k="mute"]').tap();
-    ok(await until(page, n => window.__lane.presses.length >= n + 3, 1500, n0) && (await pr()).slice(n0).join(' ') === 'back×1 volup×1 mute×1', `BACK, VOL +, MUTE go through the tablet's key lane (${(await pr()).slice(n0).join(' ')})`);
-    await page.locator('#ctl [data-k="home"]').tap();
-    ok(await mock.waitFor(() => mock.keys('home') === 1, 1500), 'HUB goes to the stick itself');
-    ok(await until(page, () => document.getElementById('c-now').textContent === 'THE HUB', 1500), 'and NOW ON TV follows: THE HUB');
-    mock.setVol({ l: 0, mute: true });
-    ok(await until(page, () => document.getElementById('c-vol').textContent === 'MUTED' && document.getElementById('c-mute').classList.contains('lit'), 1500), 'muted on the stick: MUTED, the mute key lit');
-    mock.setVol({ l: 9, mute: false });
-    ok(await until(page, () => document.getElementById('c-vol').textContent === 'VOL 9', 1500), 'VOL 9');
+    // live TV: the channel picker (the Lounge's groups)
+    ok(await page.evaluate(() => document.getElementById('c-tv-full').disabled && document.getElementById('c-tv-stop').disabled), 'nothing on: FULL SCREEN and STOP are off');
+    await page.locator('#c-tv-pick').tap();
+    ok(await page.evaluate(() => !document.getElementById('c-chs').hidden && document.querySelectorAll('#c-chs h3').length >= 3 && document.querySelectorAll('#c-chs .cc').length >= 10), 'CHANNELS opens the picker, grouped');
+    from = mock.calls.length;
+    await page.locator('#c-chs .cc[data-k="cnn"]').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt' && c.body.k === 'cnn'), 1500), 'a channel plays on the TV (/api/hub yt cnn)');
+    ok(await until(page, () => document.getElementById('c-chs').hidden && /CNN/.test(document.getElementById('c-tv-now').textContent) && !document.getElementById('c-tv-stop').disabled, 1500), 'the picker closes; LIVE TV says ▶ CNN');
+    await page.locator('#c-tv-full').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-full' && c.body.on === true), 1500), 'FULL SCREEN on the TV');
+    await page.locator('#c-tv-stop').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-stop'), 1500), 'STOP');
+
+    // the YouTube search: the stick searches, a pick plays on the TV
+    from = mock.calls.length;
+    await page.locator('#yts-q').fill('smoked brisket'); await page.locator('#yts-go').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/yts' && c.q === 'smoked brisket'), 1500), 'SEARCH asks the stick (/api/yts?q=smoked brisket)');
+    ok(await until(page, () => !document.getElementById('yts-l').hidden && document.querySelectorAll('#yts-rows .ysr').length === 5, 2000), 'five results open over the panel');
+    await page.locator('#yts-rows .ysr').nth(1).tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'ytv' && c.body.id === 'Dn5ZJz2Ta78' && c.body.t === 'Smoked Brisket on Pellet Grill'), 1500), 'a result plays on the TV (/api/hub ytv, its id and title)');
+    ok(await until(page, () => document.getElementById('yts-l').hidden && /SMOKED BRISKET ON PELLET GRILL/.test(document.getElementById('c-tv-now').textContent), 1500), 'the results close; LIVE TV names the video');
+
+    // the TV's own keyboard keys
+    n0 = (await pr()).length;
+    await page.locator('#c-kb [data-k="search"]').tap();
+    ok(await until(page, n => window.__lane.presses.slice(n).includes('search×1'), 1500, n0), 'SEARCH ON THE TV: the stick\'s search key');
     await page.locator('#c-type').tap();
     await page.locator('#c-ti').fill('abc');
-    ok(await until(page, () => window.__lane.texts.join('') === 'abc', 1500), `TYPE: the text goes out live (${await page.evaluate(() => window.__lane.texts.join(''))})`);
+    ok(await until(page, () => window.__lane.texts.join('') === 'abc', 1500), `TYPE ON THE TV: the text goes out live (${await page.evaluate(() => window.__lane.texts.join(''))})`);
     await page.locator('#c-x').tap();
 
     // off: only ON wakes it
-    await page.locator('#ctl [data-k="sleep"]').tap(); mock.setAwake(false);
-    ok(await until(page, () => document.body.classList.contains('asleep') && /TV OFF/.test(document.getElementById('c-now').textContent), 1500), 'OFF: TV OFF · PRESS ON');
+    await page.locator('.kp[data-k="sleep"]').tap(); mock.setAwake(false);
+    ok(await until(page, () => document.body.classList.contains('asleep') && /TV OFF/.test(document.getElementById('c-now').textContent), 1500), 'OFF: the clock says TV OFF · PRESS ON');
     n0 = (await pr()).length; from = mock.calls.length;
-    await page.touchscreen.tap(g.cx, g.cy); await page.locator('#ctl [data-k="volup"]').tap(); await page.locator('#ctl [data-k="home"]').tap(); await page.locator('.tapp').nth(0).tap();
+    await page.touchscreen.tap(g.cx, g.cy); await page.locator('.kp[data-k="volup"]').tap(); await page.locator('.kp[data-k="home"]').tap(); await page.locator('.tapp').nth(0).tap();
     await sleep(400);
     ok((await pr()).length === n0 && !mock.calls.slice(from).some(c => c.method !== 'GET' && c.path.startsWith('/api/') && c.path !== '/api/events'), 'asleep: OK, VOL, HUB and an app send nothing');
-    await page.locator('#ctl [data-k="wake"]').tap(); mock.setAwake(true);
+    await page.locator('.kp[data-k="wake"]').tap(); mock.setAwake(true);
     ok(await until(page, () => !document.body.classList.contains('asleep'), 4500), 'ON: awake again');
     n0 = (await pr()).length;
     await page.touchscreen.tap(g.cx, g.cy);
     ok(await until(page, n => window.__lane.presses.length > n, 1500, n0), 'and OK goes out again');
 
-    // a story stays on the TV; the screen dims after its quiet time and any touch still acts
-    const href = await page.evaluate(() => location.href);
-    if (await page.locator('.nw').count()) { await page.locator('.nw').first().tap(); await sleep(300); }
-    ok(await page.evaluate(() => location.href) === href, 'a news row never takes this page away');
-    ok(await until(page, () => document.body.classList.contains('dim') && window.__dim.includes(true), 8000), 'quiet: the tablet\'s screen dims (?dim=6000 here; 10 minutes for real)');
-    n0 = (await pr()).length;
-    await page.touchscreen.tap(g.cx, g.cy);
-    ok(await until(page, n => !document.body.classList.contains('dim') && window.__dim[window.__dim.length - 1] === false && window.__lane.presses.length > n, 1500, n0), 'a touch brightens it and still presses OK');
+    if (land) {   // a story stays on the TV; the screen dims after its quiet time and any touch still acts
+      const href = await page.evaluate(() => location.href);
+      if (await page.locator('.nw').count()) { await page.locator('.nw').first().tap(); await sleep(300); }
+      ok(await page.evaluate(() => location.href) === href, 'a news row never takes this page away');
+      ok(await until(page, () => document.body.classList.contains('dim') && window.__dim.includes(true), 8000), 'quiet: the tablet\'s screen dims (?dim=6000 here; 10 minutes for real)');
+      n0 = (await pr()).length;
+      await page.touchscreen.tap(g.cx, g.cy);
+      ok(await until(page, n => !document.body.classList.contains('dim') && window.__dim[window.__dim.length - 1] === false && window.__lane.presses.length > n, 1500, n0), 'a touch brightens it and still presses OK');
+    }
     await page.locator('#gear').tap();
     ok(await page.evaluate(() => window.__panel === 1), 'the gear opens the tablet\'s own panel');
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
@@ -712,7 +751,7 @@ try {
       await tabletFull();
       await otherSize('tablet-land');
       await otherSize('iphone');
-      if (n === 'chromium') await controller();   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
+      if (n === 'chromium') { await controller('tablet-land'); await controller('tablet'); }   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
     } finally { await browser.close(); browser = null; }
   }
 } finally {

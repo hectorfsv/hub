@@ -16,6 +16,13 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.dirname(HERE);
+const YTS = q => [
+  { id: 'PVycYj_PKgk', t: 'EASY ' + q + ' recipe to nail it your first time', ch: 'Steve Gow (Smoke Trails BBQ)', len: '12:24' },
+  { id: 'Dn5ZJz2Ta78', t: 'Smoked Brisket on Pellet Grill', ch: 'HowToBBQRight', len: '9:40' },
+  { id: 'klmG0DQgEJs', t: 'Brisket on a Pellet Grill', ch: 'Meat Church BBQ', len: '20:28' },
+  { id: 'C96oohpWBGw', t: 'LIVE NEWS: LiveNOW FOX 24/7 LIVE STREAM', ch: 'LiveNOW from FOX', len: 'LIVE' },
+  { id: 'rHSSlHJ_hkg', t: 'Perfecting Texas Style Brisket - a complete guide with every step from trim to slice', ch: 'Meat Church BBQ', len: '21:55' },
+];
 export const TOKEN = '6f1c2a9e8d7b4c3a5e0f9d8c7b6a5e4d';     // a fixed test key (32 hex), never a real one
 export const KEYS = ['up', 'down', 'left', 'right', 'select', 'back', 'home', 'menu', 'playpause', 'rewind', 'forward', 'volup', 'voldown', 'mute', 'sleep', 'wake', 'enter', 'del', 'search'];
 const TYPES = { '.html': 'text/html; charset=utf-8', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.json': 'application/json', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg' };
@@ -126,6 +133,10 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
       case 'GET /api/state': rec.status = 200; rec.delivered = true; return json(res, 200, st);
       case 'GET /api/events': return events(req, res, rec);
       case 'GET /api/apps': rec.status = 200; rec.delivered = true; return json(res, 200, APPS);
+      case 'GET /api/yts': {   // the stick's YouTube search (YtSearch): canned results, the words echoed in the first title
+        const q = String(u.searchParams.get('q') || '').trim(); rec.status = 200; rec.delivered = true; rec.q = q;
+        return json(res, 200, q ? YTS(q) : []);
+      }
       case 'POST /api/key': {
         const n = b.n == null ? 1 : b.n;
         if (!KEYS.includes(b.k) || !Number.isInteger(n) || n < 1 || n > 10) return bad();
@@ -148,6 +159,7 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
       }
       case 'POST /api/hub': {
         const ok = (b.do === 'yt' && typeof b.k === 'string' && /^[a-z0-9-]+$/.test(b.k)) || b.do === 'yt-stop' || (b.do === 'yt-full' && typeof b.on === 'boolean')
+          || (b.do === 'ytv' && typeof b.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(b.id) && typeof b.t === 'string')
           || (b.do === 'open' && Number.isInteger(b.i) && b.i >= 0 && b.i <= 2);
         if (!ok) return bad();
         done();

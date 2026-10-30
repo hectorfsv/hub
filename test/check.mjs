@@ -84,6 +84,13 @@ async function open(view, { app = false, linked = false, cooking = false, query 
           { name: 'Home Assistant', url: '', mic: false }] }),
         open: i => window.__calls.push('open:' + i), talk: () => window.__calls.push('talk'), panel: () => window.__calls.push('panel'), dim: on => window.__calls.push('dim:' + on),
         apps: () => JSON.stringify(apps), launch: pkg => window.__calls.push('launch:' + pkg),
+        ytSearch: (q, n) => {   // the app's YouTube search (YtSearch): canned results, answered as the app does, a moment later
+          window.__calls.push('yts:' + q);
+          setTimeout(() => window.hub.ytsDone(n, JSON.stringify([
+            { id: 'PVycYj_PKgk', t: 'EASY ' + q + ' recipe', ch: 'Steve Gow', len: '12:24' },
+            { id: 'Dn5ZJz2Ta78', t: 'Smoked Brisket on Pellet Grill', ch: 'HowToBBQRight', len: '9:40' },
+            { id: 'C96oohpWBGw', t: 'LIVE NEWS: LiveNOW FOX', ch: 'LiveNOW from FOX', len: 'LIVE' }])), 150);
+        },
       };
     }
   }, [app, linked, battery, tv, apps]);
@@ -95,7 +102,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
       'rss.dw.com/rdf/rss-en-all': rss([['Germany debates its budget', .3]]),
       'www.israelnationalnews.com/Rss.aspx': rss([['Knesset votes on the draft law', 4]]) };
     await page.route(/^https:\/\/(moxie\.foxnews\.com|rss\.dw\.com|www\.israelnationalnews\.com)\//, r => {
-      const k = Object.keys(FEED).find(x => r.request().url().includes(x));
+      const k = Object.keys(FEED).find(x => r.request().url().includes(x)); hits.feeds = (hits.feeds || 0) + 1;
       return r.fulfill({ status: 200, contentType: 'application/xml', body: k ? FEED[k] : '<rss/>' });
     });
     await page.route('https://www.youtube.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>player</title><body style="background:#300">player</body>' }));
@@ -553,9 +560,37 @@ try {
     const first = await page.$eval('.nw small', e => e.textContent);
     ok(/^FOX (US|POLITICS)/.test(first), `the news starts with a US story (${first})`);
     await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
-    ok(await page.$eval('.cur', e => e.classList.contains('nw')), 'Down from the channels: the news');
+    ok(await page.$eval('.cur', e => e.id === 'yts-q') && await page.evaluate(() => document.activeElement.id !== 'yts-q'), 'Down from the channels: the YouTube search, and no keyboard yet (only Select brings it)');
+    await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
+    ok(await page.$eval('.cur', e => e.classList.contains('nw')), 'Down again: the news');
     await page.keyboard.press('Enter'); await page.waitForTimeout(400);
     ok(/^https:\/\/news\.test\//.test(hits.story || ''), 'Select on a story opens it (the app shows it on top)');
+    // the news only by hand (10-30): its REFRESH reads the feeds again; the time it was read stays
+    ok(/^UPDATED \d\d:\d\d$/.test(await page.$eval('#news-at', e => e.textContent)), 'the news says when it was read');
+    const feedsBefore = hits.feeds || 0;
+    await page.evaluate(() => window.hub.tv().TV.ring(document.getElementById('news-r')));
+    await page.keyboard.press('Enter'); await page.waitForTimeout(600);
+    ok((hits.feeds || 0) > feedsBefore, `REFRESH reads the feeds again (${(hits.feeds || 0) - feedsBefore} fetches)`);
+    // the YouTube search: Select on the field, the words, the results in the news's place, Select plays, Back closes
+    await page.evaluate(() => window.hub.tv().TV.ring(document.getElementById('yts-q')));
+    await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    ok(await page.evaluate(() => document.activeElement.id === 'yts-q'), 'Select on the search field: the keyboard (the field takes the typing)');
+    await page.keyboard.type('smoked brisket'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
+    ok(await page.evaluate(() => window.__calls.includes('yts:smoked brisket')), 'the words go to the app\'s search');
+    ok(await page.evaluate(() => !document.getElementById('yts-l').hidden && getComputedStyle(document.getElementById('news')).display === 'none' && document.querySelectorAll('#yts-rows .ysr').length === 3), 'three results in the news\'s place');
+    ok(await page.$eval('.cur', e => e.classList.contains('ysr')), 'the ring is on the first result');
+    await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    ok(await page.evaluate(() => { const f = document.querySelector('#yt-scr iframe'); return !!f && /embed\/Dn5ZJz2Ta78\?/.test(f.src) && document.getElementById('yt-name').textContent === 'SMOKED BRISKET ON PELLET GRILL'; }), 'Select on the second: it plays in the tile, its title on it');
+    ok(await page.evaluate(() => document.getElementById('yts-l').hidden && getComputedStyle(document.getElementById('news')).display !== 'none'), 'and the news is back');
+    ok(await page.$eval('.cur', e => e.id === 'yt-scr'), 'the ring is on the picture');
+    await page.evaluate(() => window.hub.tv().YTS.search('brisket'));
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    ok(await page.evaluate(() => document.getElementById('yts-l').hidden && !!document.querySelector('#yt-scr iframe')), 'Back on the results closes them, and the video keeps playing');
+    ok(await page.$eval('.cur', e => e.id === 'yts-q'), 'the ring goes back to the search');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    ok(await page.evaluate(() => !document.querySelector('#yt-scr iframe')), 'Back again stops the video, as for a channel');
     await shot(page, 'tv-layout');
     ok(!errors.length, errs(errors));
     await ctx.close();
