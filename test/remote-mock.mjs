@@ -70,7 +70,8 @@ export const APPS = [
 
 export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, pingMs = 20000, quiet = true } = {}) {
   const FRONT0 = { pkg: 'com.netflix.ninja', name: 'Netflix', hub: false };
-  const st = { v: '2.6', front: { ...FRONT0 }, adb: 'ok' };
+  const VOL0 = { l: 15, max: 15, mute: false, ok: true };
+  const st = { v: '2.10', front: { ...FRONT0 }, adb: 'ok', awake: true, vol: { ...VOL0 } };
   const calls = [], streams = new Set(), sockets = new Set(), held = [];
   let offline = false, delay = 0;              // offline: false | 'refuse' (connections cut) | 'hang' (never answers)
   const log = (...a) => { if (!quiet) console.log(...a); };
@@ -120,6 +121,7 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
     const b = rec.body && typeof rec.body === 'object' ? rec.body : {};
     const bad = () => { rec.status = 400; json(res, 400, { error: 'bad' }); };
     const done = () => { rec.status = 204; rec.delivered = true; empty(res, 204); };
+    if (req.method === 'POST' && !st.awake && !(u.pathname === '/api/key' && b.k === 'wake')) { rec.status = 409; return json(res, 409, { error: 'asleep' }); }   // the TV is off: only ON
     switch (`${req.method} ${u.pathname}`) {
       case 'GET /api/state': rec.status = 200; rec.delivered = true; return json(res, 200, st);
       case 'GET /api/events': return events(req, res, rec);
@@ -130,6 +132,8 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
         if (st.adb !== 'ok') { rec.status = 503; return json(res, 503, { error: 'adb', adb: st.adb }); }
         done();
         if (b.k === 'home') { st.front = { ...HUB }; push(); }   // home brings the HUB to the front
+        if (b.k === 'sleep') M.setAwake(false);
+        if (b.k === 'wake') M.setAwake(true);
         return;
       }
       case 'POST /api/text':
@@ -190,6 +194,8 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
     url: `http://${host}:${server.address().port}`, token, calls, state: st, apps: APPS,
     setFront(f) { st.front = f && f.hub ? { ...HUB } : { pkg: String(f.pkg || ''), name: String(f.name || f.pkg || ''), hub: false }; push(); },
     setAdb(a) { st.adb = ['ok', 'asking', 'off'].includes(a) ? a : 'ok'; push(); },
+    setAwake(a) { st.awake = !!a; st.front = a ? { ...HUB } : null; push(); },   // asleep: nothing on the TV; awake: the HUB
+    setVol(v) { st.vol = { ...st.vol, ...v }; push(); },
     setDelay(ms) { delay = Math.max(0, +ms || 0); },
     setOffline(mode) {
       const was = offline;
@@ -204,7 +210,7 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
     streams: () => streams.size,
     delivered: p => calls.filter(c => c.delivered && (!p || c.path === p)),
     keys: k => calls.filter(c => c.delivered && c.path === '/api/key' && (!k || c.body.k === k)).reduce((s, c) => s + c.body.n, 0),
-    reset() { M.setOffline(false); delay = 0; st.front = { ...FRONT0 }; st.adb = 'ok'; calls.length = 0; push(); },
+    reset() { M.setOffline(false); delay = 0; st.front = { ...FRONT0 }; st.adb = 'ok'; st.awake = true; st.vol = { ...VOL0 }; calls.length = 0; push(); },
     waitFor(pred, ms = 2000) {
       return new Promise(ok => {
         const t0 = Date.now();

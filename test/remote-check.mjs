@@ -172,7 +172,7 @@ async function tabletFull() {
     const g = (await st(page)).geo;
 
     // every key sends its own call, once
-    const KEYS = [['.pod[data-key=back]', 'back'], ['.pod[data-key=home]', 'home'], ['.pod[data-key=menu]', 'menu'], ['[data-key=wake]', 'wake'], ['[data-key=sleep]', 'sleep'],
+    const KEYS = [['.pod[data-key=back]', 'back'], ['.pod[data-key=home]', 'home'], ['.pod[data-key=menu]', 'menu'], ['[data-key=sleep]', 'sleep'], ['[data-key=wake]', 'wake'],
       ['[data-key=mute]', 'mute'], ['[data-key=volup]', 'volup'], ['[data-key=voldown]', 'voldown'], ['[data-key=rewind]', 'rewind'], ['[data-key=playpause]', 'playpause'],
       ['[data-key=forward]', 'forward'], ['[data-key=search]', 'search'], ['[data-key=del]', 'del'], ['[data-key=enter]', 'enter']];
     const wrong = [];
@@ -470,6 +470,48 @@ async function tabletFull() {
       ok(await until(page, () => window.__lane.presses.length >= 2, 1500), `keys go through the app (${await page.evaluate(() => window.__lane.presses.join(' '))})`);
       await sleep(300);
       ok(mock.calls.slice(from).every(c => c.path !== '/api/key' && c.path !== '/api/text'), 'and never to the stick\'s /api/key or /api/text');
+      from = mock.calls.length;
+      await page.locator('.pod[data-key="home"]').tap();
+      ok(await mock.waitFor(() => mock.keys('home') === 1, 1500), 'HUB goes to the stick\'s /api/key, not the lane (the lane has no Home: 10-30 it did nothing in Netflix)');
+      ok(await until(page, () => document.getElementById('now-name').textContent === 'THE HUB', 1500), 'and the HUB comes to the front');
+      ok(!(await page.evaluate(() => window.__lane.presses.some(p => p.startsWith('home')))), 'the lane never saw it');
+      ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+    } finally { await ctx.close(); }
+  }
+
+  // OFF: only ON wakes the TV (his word 10-30); the volume the stick reports
+  console.log(`\n${name}: off, on and the volume`);
+  mock.reset();
+  {
+    const { ctx, page, errors } = await open('tablet', { query: 'k=' + TOKEN });
+    try {
+      ok(await linked(page), 'linked');
+      ok(await page.locator('#vol-t').textContent() === 'VOL 15', 'the stick\'s volume shows: VOL 15');
+      mock.setVol({ l: 9 });
+      ok(await until(page, () => document.getElementById('vol-t').textContent === 'VOL 9', 1500), 'a change on the stick shows at once: VOL 9');
+      mock.setVol({ l: 0, mute: true });
+      ok(await until(page, () => document.getElementById('vol-t').textContent === 'MUTED' && document.querySelector('[data-key="mute"]').classList.contains('lit'), 1500), 'muted: MUTED, and the mute key is lit');
+      mock.setVol({ l: 9, mute: false });
+      await page.locator('[data-key="sleep"]').tap();
+      ok(await until(page, () => document.body.classList.contains('asleep') && /TV OFF/.test(document.getElementById('now-name').textContent), 1500), 'OFF: the remote says TV OFF · PRESS ON');
+      ok(await mock.waitFor(() => mock.keys('sleep') === 1 && mock.state.awake === false, 1500), 'and the stick got sleep');
+      const from = mock.calls.length;
+      const g = (await st(page)).geo;
+      await page.touchscreen.tap(...segPt(g, 'up'));
+      await page.locator('[data-key="volup"]').tap();
+      await page.locator('.pod[data-key="home"]').tap();
+      await page.locator('[data-key="mute"]').tap();
+      await sleep(400);
+      ok(anyKeyRequest(from).length === 0, 'asleep: arrows, volume, HUB and mute send nothing');
+      ok(await until(page, () => /PRESS ON/.test(document.getElementById('toast').textContent), 500), 'and say THE TV IS OFF · PRESS ON');
+      await page.locator('[data-key="wake"]').tap();
+      ok(await mock.waitFor(() => mock.keys('wake') === 1 && mock.state.awake === true, 1500), 'ON goes out and wakes the stick');
+      ok(await until(page, () => !document.body.classList.contains('asleep') && document.getElementById('now-name').textContent === 'THE HUB', 1500), 'awake: the keys are back, THE HUB in front');
+      const f2 = mock.calls.length;
+      await page.touchscreen.tap(...segPt(g, 'up'));
+      ok(await mock.waitFor(() => keyCalls(f2).some(c => c.body.k === 'up'), 1500), 'and an arrow goes out again');
+      mock.setAwake(false);   // slept some other way (the stick's own timer)
+      ok(await until(page, () => document.body.classList.contains('asleep'), 4500), 'the stick asleep by itself: the remote locks too');
       ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     } finally { await ctx.close(); }
   }
@@ -525,9 +567,9 @@ async function otherSize(view) {
     const g = (await st(page)).geo;
     let from = mock.calls.length;
     await page.touchscreen.tap(g.cx, g.cy); await page.touchscreen.tap(...segPt(g, 'left'));
-    await tap(page, '[data-key=volup]'); await tap(page, '.pod[data-key=back]'); await tap(page, '[data-key=sleep]');
-    await mock.waitFor(() => keyCalls(from).length >= 5, 2000); await sleep(80);
-    ok(keyCalls(from).map(c => c.body.k).join(',') === 'select,left,volup,back,sleep', `OK, an arrow, volume, back, off: each its call (${keyCalls(from).map(c => c.body.k).join(',')})`);
+    await tap(page, '[data-key=volup]'); await tap(page, '.pod[data-key=back]'); await tap(page, '[data-key=sleep]'); await tap(page, '[data-key=wake]');
+    await mock.waitFor(() => keyCalls(from).length >= 6, 2000); await sleep(80);
+    ok(keyCalls(from).map(c => c.body.k).join(',') === 'select,left,volup,back,sleep,wake', `OK, an arrow, volume, back, off, on: each its call (${keyCalls(from).map(c => c.body.k).join(',')})`);
     const step = (await st(page)).step;
     from = mock.calls.length;
     await page.mouse.move(g.cx, g.cy); await page.mouse.down(); await page.mouse.move(g.cx, g.cy - step * 2.5, { steps: 1 }); await page.mouse.up();

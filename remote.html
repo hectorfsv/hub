@@ -107,6 +107,9 @@ svg{overflow:visible}
 /* ---- the stage: the reactor (the d-pad), its pods on the orbit, the keys at its sides ---- */
 #stage,#deck{transition:opacity .4s ease}
 body.off #stage,body.off #deck{opacity:.42}
+body.asleep .pod,body.asleep .plabel,body.asleep #reactor,body.asleep #side-r,body.asleep #deck,body.asleep [data-key=sleep],body.asleep [data-key=mute]{opacity:.3}
+body.asleep [data-key=wake]::after,.k.lit::after{opacity:.6}
+body.asleep [data-key=wake] small,.k.lit small{color:var(--gold-hot)}
 #stage{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
 #stage>*{position:absolute;pointer-events:auto}
 #stage>#orbit,#stage>.plabel{pointer-events:none}
@@ -253,7 +256,7 @@ body.land #deck{left:auto;top:var(--deckT);width:var(--deckW);justify-content:ce
   </div>
   <div class="side" id="side-r">
     <div class="cap">
-      <button type="button" class="k" data-key="volup" data-rep data-ic="volup" aria-label="Volume up"></button><i><b>VOL</b></i>
+      <button type="button" class="k" data-key="volup" data-rep data-ic="volup" aria-label="Volume up"></button><i><b id="vol-t">VOL</b></i>
       <button type="button" class="k" data-key="voldown" data-rep data-ic="voldn" aria-label="Volume down"></button>
     </div>
   </div>
@@ -330,7 +333,7 @@ const store = {
 };
 const AUTH = { k: window.__hubsKey || store.get(KEYNAME) || null };
 try { delete window.__hubsKey; } catch (e) { /* an old engine */ }
-const S = { geo: null, front: null, adb: 'ok', v: '', auth: AUTH.k ? null : 'key', dimmed: false, tDim: 0, sheet: false, yt: null, ytFull: false, adbRefused: false, now: '', tiltT: 0, tilt: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)' };
+const S = { geo: null, front: null, adb: 'ok', v: '', auth: AUTH.k ? null : 'key', dimmed: false, tDim: 0, sheet: false, yt: null, ytFull: false, adbRefused: false, asleep: false, powerAt: 0, stAwake: null, tPow: 0, vol: null, now: '', tiltT: 0, tilt: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)' };
 const NET = { state: 'boot', q: [], busy: false, fails: 0, ctl: null, es: null, gen: 0, retryT: 0, dog: 0, live: false, probeAt: 0, sent: 0, dropped: 0 };
 const APPS = { list: [], at: 0, busy: false };
 const PTR = new Map();                          // every finger (or the mouse) on a control, by pointerId
@@ -561,6 +564,7 @@ function enqueue(kind, o) {
   if (S.auth === 'key' || !AUTH.k) { denied(); return false; }
   if (NET.state === 'offline') { NET.dropped++; denied(); probe(); return false; }
   if ((kind === 'key' || kind === 'text') && S.adb === 'asking') { NET.dropped++; denied(); return false; }
+  if (S.asleep && !(kind === 'key' && o.k === 'wake')) { NET.dropped++; toast('THE TV IS OFF · PRESS ON'); return false; }   // his word 10-30: only ON wakes it
   const tail = NET.q[NET.q.length - 1];
   if (tail && kind === 'key' && tail.kind === 'key' && tail.k === o.k && tail.n + o.n <= 10) tail.n += o.n;          // presses still waiting ride together
   else if (tail && kind === 'text' && tail.kind === 'text' && tail.text.length + o.text.length <= 200) tail.text += o.text;
@@ -576,7 +580,7 @@ async function pump() {
     while (NET.q.length) {
       const o = NET.q.shift();
       if (performance.now() - o.at > (o.kind === 'key' ? CFG.stale : CFG.staleOp)) { NET.dropped++; continue; }   // too late to mean anything
-      if (LANE && (o.kind === 'key' || o.kind === 'text')) {
+      if (LANE && ((o.kind === 'key' && o.k !== 'home') || o.kind === 'text')) {   // HUB is the stick's own: it brings the HUB, from any app
         const got = o.kind === 'key' ? LANE.press(o.k, o.n) : LANE.type(o.text);
         if (got === 'ok') { NET.sent++; if (S.adbRefused || S.adb !== 'ok') { S.adbRefused = false; S.adb = 'ok'; renderStatus(); } }
         else { NET.q = NET.q.filter(x => x.kind !== 'key' && x.kind !== 'text'); adbState(got, true); }
@@ -594,6 +598,7 @@ async function pump() {
       }
       let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
       if (r.status === 503 && j && j.error === 'adb') { NET.q = NET.q.filter(x => x.kind !== 'key' && x.kind !== 'text'); adbState(j.adb, true); continue; }
+      if (r.status === 409 && j && j.error === 'asleep') { NET.q.length = 0; power(false, true); toast('THE TV IS OFF · PRESS ON'); continue; }
       if (r.status === 404 && o.kind === 'launch') { toast("THAT APP ISN'T ON THE TV"); loadApps(true); continue; }
       toast('THE STICK SAID ' + r.status);
     }
@@ -604,6 +609,22 @@ function adbState(a, refused) {
   S.adb = a === 'asking' || a === 'off' ? a : 'ok';
   S.adbRefused = S.adb === 'off' && (!!refused || S.adbRefused);
   renderStatus();
+}
+function syncPower() {   // the stick's word, once a press of ON/OFF here is 3 s old (a state sent before the press arrives late)
+  clearTimeout(S.tPow);
+  const w = 3000 - (Date.now() - S.powerAt);
+  if (w > 0) { S.tPow = setTimeout(syncPower, w); return; }
+  if (typeof S.stAwake === 'boolean') power(S.stAwake, false);
+}
+function power(awake, mine) {   // mine: ON or OFF pressed here, shown at once; the stick has the last word (syncPower)
+  if (mine) { S.powerAt = Date.now(); syncPower(); }
+  if (S.asleep === !awake) return;
+  S.asleep = !awake; body.classList.toggle('asleep', S.asleep); renderNow();
+}
+function renderVol() {
+  const v = S.vol;
+  $('vol-t').textContent = !v || v.ok === false ? 'VOL' : v.mute ? 'MUTED' : 'VOL ' + v.l;
+  doc.querySelector('[data-key="mute"]').classList.toggle('lit', !!(v && v.mute));
 }
 function setNet(s) { if (NET.state !== s) { NET.state = s; renderStatus(); } }
 function lost() { if (NET.state === 'ok' || NET.state === 'boot') setNet('reconnecting'); connect(); }   // a call got no answer: the stream decides
@@ -683,6 +704,9 @@ function applyState(st) {
   S.front = st.front && typeof st.front === 'object' ? st.front : null;
   S.v = typeof st.v === 'string' ? st.v : S.v;
   adbState(LANE ? LANE.keyState() : st.adb, false);
+  if (typeof st.awake === 'boolean') { S.stAwake = st.awake; syncPower(); }
+  S.vol = st.vol && typeof st.vol === 'object' ? st.vol : null;
+  renderVol();
   if (S.front && !S.front.hub && (!was || was.hub)) { S.yt = null; S.ytFull = false; paintYT(); }   // the HUB left the screen: its video is off
   if (S.front && S.front.pkg && !S.front.hub && APPS.at && !APPS.list.some(a => a.pkg === S.front.pkg) && Date.now() - APPS.at > 60e3) loadApps(true);
   renderNow();
@@ -707,6 +731,7 @@ function renderStatus() {
 function nowInfo() {
   const f = S.front;
   if (S.auth === 'key') return { name: 'KEY NEEDED', glyph: I.tv, key: '!' };
+  if (S.asleep) return { name: 'TV OFF · PRESS ON', glyph: I.tv, key: 'off' };
   if (!f) return { name: NET.live ? '—' : 'LINKING…', glyph: I.tv, key: '' };
   if (f.hub) return { name: 'THE HUB', glyph: I.hub, key: 'hub' };
   const a = APPS.list.find(x => x.pkg === f.pkg);
@@ -859,7 +884,7 @@ function bindKey(el) {
   el.addEventListener('click', e => { if (e.detail === 0) { keyPress(el, k); setTimeout(() => el.classList.remove('down'), 140); } });   // a keyboard's Enter or Space
 }
 function keyPress(el, k) {
-  send(k, 1);
+  if (send(k, 1) && (k === 'sleep' || k === 'wake')) power(k === 'wake', true);
   el.classList.add('down');
   if (k === 'enter') clearType();
 }
@@ -990,7 +1015,7 @@ window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layo
 
 // ---- a handle for the tests (and a look from the Mac): reads only ----
 window.remote = {
-  state: () => JSON.parse(JSON.stringify({ net: NET.state, live: NET.live, adb: S.adb, auth: S.auth, front: S.front, v: S.v, dimmed: S.dimmed,
+  state: () => JSON.parse(JSON.stringify({ net: NET.state, live: NET.live, adb: S.adb, auth: S.auth, front: S.front, v: S.v, dimmed: S.dimmed, asleep: S.asleep, vol: S.vol,
     apps: APPS.list.length, queue: NET.q.length, sent: NET.sent, dropped: NET.dropped, geo: S.geo, step: step(), pointers: PTR.size, motion: MOTION, streams: STREAMS, yt: S.yt, ytFull: S.ytFull })),
   cfg: CFG,
 };
