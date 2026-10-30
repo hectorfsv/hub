@@ -148,9 +148,16 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 /* the stick's layer diet (10-29, measured: every composited layer costs its chip per frame; 63 layers = 1.9 cores): on a TV the 1-px
    scan line, the three orbit runners and 8 of the 14 motes stay out; the rings, the orbs, the glows and the clock keep moving */
 .tv #scan,.tv .runner,.tv .mote:nth-child(n+7){display:none}
-/* the stick's WebView draws SVG text under 8 units out of place (the power and air labels jumped into the clock's name line;
-   measured 10-29: 6.4 broken with or without its 8-px minimum font, 8.4 right): on a TV they are 8.4 */
-.tv .g-lab,.tv #tm-txt{font-size:8.4px}
+/* the stick's WebView draws the core's SVG text out of place after the clock's minute update (the power and air labels jumped
+   into the name line; measured 10-29: the layout boxes are right, the drawing is not; any restyle only hides it until the next
+   minute). On a TV that text becomes one HTML line under the date: the timer while it runs, else the air. The power bracket
+   goes too: a TV stick is always on power at 100% */
+#tvline{display:none}
+body.tv #tvline{display:block;color:var(--dim);font-size:calc(var(--R)*.062);letter-spacing:.22em;margin-top:calc(var(--R)*.05)}
+body.tv #tvline b{font-weight:600;color:var(--gold-hot)}
+body.tv .g-lab,body.tv #tm-txt,body.tv #bolt{display:none}
+/* a video in the tile: the floating sparks step out (measured 10-29 on the stick: 16 late video frames in 208 with them, 0 without) */
+body.yt-on #motes,body.yt-on #embers{display:none}
 /* ---- the TV layout (Hector 10-29: "the streaming platforms around the clock", the weather smaller, YouTube under it, the news) ----
    Only with the app's `tv`; the tablet's layout is untouched. 1443x812 CSS px on the stick. */
 #apps,#tvcol,#appname{display:none}
@@ -333,7 +340,7 @@ body.dim #scan,body.dim #motes{display:none}
   <div class="core"></div>
   <div class="pulse"></div>
   <div class="spin r-sec" id="sec"><i></i></div>
-  <div class="clock" id="clock"><div class="time" id="time">--:--</div><div class="date" id="date"></div><div class="date" id="appname"></div></div>
+  <div class="clock" id="clock"><div class="time" id="time">--:--</div><div class="date" id="date"></div><div class="date" id="appname"></div><div class="date" id="tvline"></div></div>
 </div>
 <div id="pods"></div>
 <div id="apps" aria-label="Apps"></div>
@@ -1031,10 +1038,20 @@ function renderGauges() {
   const pc = low ? '#FF3B30' : '#FFB547', ac = aq == null ? '#FFB547' : aq <= 50 ? '#FFD27A' : aq <= 100 ? '#FFB547' : aq <= 150 ? '#FF8A3A' : '#FF3B30';
   const key = [pl, pc, pct, chg, al, ac, aq].join();
   if (key === S.gKey) return; S.gKey = key;
-  g.innerHTML = bracket(-1, pl, pc) + bracket(1, al, ac)
+  tvLine();
+  g.innerHTML = (S.tv ? '' : bracket(-1, pl, pc)) + bracket(1, al, ac)
     + (chg ? '<path id="bolt" d="M-41 31.8l-3.4 4.1h1.9l-1.1 3.1 3.2-4.6h-1.9z" fill="#FFE9B0"/>' : '')
     + `<text class="g-lab" id="pw-lab" x="${chg ? -39.4 : -44.6}" y="38.6" fill="${low ? '#FF8A80' : '#FFD27A'}">${pct == null ? '—' : pct + '%'}</text>`
     + `<text class="g-lab" id="aq-lab" x="44.6" y="38.6" text-anchor="end" fill="${aq != null && aq > 100 ? ac : '#FFD27A'}"><tspan fill="#9A8C8A">AQI </tspan>${aq == null ? '—' : aq}</text>`;
+}
+// a TV's line under the clock's date (its SVG text misplaces on the stick): the timer while it runs, else the air
+function tvLine() {
+  const el = $('tvline'); if (!el || !S.tv) return;
+  const t = S.tmr;
+  if (t) { el.innerHTML = t.done ? '<b>TIMER DONE</b>' : `TIMER <b>${clockLeft(t.end - Date.now())}</b>`; return; }
+  const aq = S.air && Date.now() - S.air.at < 3 * 3600e3 ? Math.round(S.air.aqi) : null;
+  const c = aq == null ? '' : aq <= 50 ? '#FFD27A' : aq <= 100 ? '#FFB547' : aq <= 150 ? '#FF8A3A' : '#FF3B30';
+  el.innerHTML = aq == null ? '' : `AIR <b style="color:${c}">${aq}</b> AQI`;
 }
 // plugged in: a spark runs up the power bracket
 function spark() {
@@ -1133,12 +1150,13 @@ function renderTimer() {
   clearTimeout(T.t);
   const t = S.tmr;
   g.classList.toggle('on', !!t); g.classList.toggle('done', !!(t && t.done));
+  tvLine();
   if (!t) return;
   const left = t.end - Date.now();
   if (!t.done && left <= 0) { timerDone(); return; }
   const lit = t.done ? 60 : Math.ceil(clamp(left / t.len, 0, 1) * 60), cs = $('tm-cells').children;
   if (lit !== T.lit) { for (let k = Math.min(lit, T.lit || 0); k < Math.max(lit, T.lit || 0); k++) cs[k].setAttribute('opacity', k < lit ? 1 : 0); T.lit = lit; }
-  $('tm-txt').textContent = t.done ? 'DONE' : clockLeft(left);
+  $('tm-txt').textContent = t.done ? 'DONE' : clockLeft(left); tvLine();
   const lf = $('tm-left'); if (lf) lf.textContent = t.done ? 'DONE' : `RUNNING · ${clockLeft(left)} LEFT`;
   if (!t.done) T.t = setTimeout(renderTimer, doc.hidden ? left + 30 : (left - 1) % 1000 + 30);   // hidden: one wake-up, at zero
 }

@@ -461,6 +461,7 @@ try {
     }
     ok(!hits2.length, `tv layout: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
+    ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
     ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "the Lounge's twelve channels and the YouTube app in the tile");
     // the remote: it starts on the first app and walks the ring
     ok((await curName()) === 'Netflix', 'the ring starts on the first app');
@@ -476,6 +477,13 @@ try {
     ok(await cur('#clock') && await page.isVisible('#date'), 'Right from the ring: the clock (its date back)');
     await page.keyboard.press('Enter'); await page.waitForTimeout(200);
     ok(await page.$eval('#sheet', f => !f.hidden && /KITCHEN TIMER/.test(f.textContent)) && await cur('#sheet [data-min="1"]'), 'Select on the clock: the kitchen timer, the ring on 1 MIN');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    ok(/TIMER\s*0?:?\d/.test(await page.textContent('#tvline')), `a running timer shows in the clock's text line (${await page.textContent('#tvline')})`);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    await page.evaluate(() => { const b = document.getElementById('tm-stop'); if (b) b.click(); });
+    await page.waitForTimeout(200);
+    ok(/AIR/.test(await page.textContent('#tvline')), 'stopped: the line is the air again');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(200);
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     ok(await page.$eval('#sheet', f => f.hidden) && await cur('#clock'), 'Back closes the sheet; the ring is back on the clock');
     await page.keyboard.press('ArrowRight');
