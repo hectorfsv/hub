@@ -463,6 +463,11 @@ try {
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
     ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
     ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "the Lounge's twelve channels and the YouTube app in the tile");
+    const touched = await page.evaluate(async () => {   // the Pit's poll every minute: with nothing new it must touch nothing
+      hub.renderPods(); let n = 0; const mo = new MutationObserver(l => { n += l.length; });
+      document.querySelectorAll('.pod, .label').forEach(e => mo.observe(e, { subtree: true, childList: true, attributes: true, characterData: true }));
+      hub.renderPods(); hub.renderPods(); await new Promise(r => setTimeout(r, 50)); mo.disconnect(); return n; });
+    ok(touched === 0, `a poll with nothing new touches nothing on the page (10-29: the flash at :40 past each minute; ${touched} changes)`);
     ok((await page.$eval('#yt-scr', e => getComputedStyle(e).borderRadius)) === '0px', 'the tile has square corners (the stick shows no video through a rounded clip: black, 10-29)');
     const kept = await page.evaluate(async () => {   // a player that takes the keyboard gives it back to the page
       const f = document.createElement('iframe'); f.srcdoc = '<button>x</button>'; document.body.appendChild(f);

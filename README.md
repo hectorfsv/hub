@@ -99,7 +99,7 @@ an HTML line under the date (the stick misdraws the core's SVG text).
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 231 checks (the TV view, the remote and the TV layout since 10-29; the tile's square corners and the keyboard taken back from the player since 10-29 late):
+It has 232 checks (the TV view, the remote and the TV layout since 10-29; the tile's square corners and the keyboard taken back from the player since 10-29 late):
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;

@@ -588,18 +588,24 @@ function renderPods() {
     } else if (i === S.pitIx && S.pit === 'idle') a = !S.idle ? '<em class="ok">●</em> IDLE' : S.idle.power === false ? '<em>○</em> SMOKER OFF' : `<em class="ok">●</em> ON · PIT ${deg(S.idle.pit)}`;
     else a = S.reach[i] === 'on' ? '<em class="ok">●</em> ONLINE' : '<em>○</em> CHECKING';
     if (i === S.pitIx && s.url && S.pit === 'unlinked') b = '';
-    st.innerHTML = a;
-    st2.hidden = !b; st2.innerHTML = b;
+    // only what changed is touched: the Pit's poll rewrote all of it every minute, and on the stick a rewrite could blank
+    // the whole page for a frame (10-29: the flashes at :40 past each minute, the poll's second)
+    if (st.innerHTML !== a) st.innerHTML = a;
+    if (st2.hidden !== !b) st2.hidden = !b;
+    if (st2.innerHTML !== b) st2.innerHTML = b;
     pod.classList.toggle('hot', hot);
-    const old = $('chip' + i), hadRing = !!(old && old.classList.contains('cur')); if (old) old.remove();
-    if (i === S.pitIx && s.url && S.pit === 'unlinked' && S.reach[i] !== 'off') {
+    const old = $('chip' + i), want = i === S.pitIx && s.url && S.pit === 'unlinked' && S.reach[i] !== 'off';
+    if (old && !want) old.remove();
+    if (want && !old) {
       const c = doc.createElement('span'); c.className = 'chip'; c.id = 'chip' + i; c.textContent = 'LINK LIVE COOKS';
       c.addEventListener('click', e => { e.stopPropagation(); openSheet(); });
       $('label' + i).appendChild(c);
-      if (hadRing) { c.classList.add('cur'); try { TV.cur = c; } catch (x) { /* before the remote's code exists */ } }
     }
     const m = $('meter' + i);
-    if (m) { const f = hot && S.cook.meat && S.cook.meat.target ? clamp(S.cook.meat.t / S.cook.meat.target, 0, 1) : hot ? 1 : 0; m.setAttribute('stroke-dasharray', `${(f * 295.3).toFixed(1)} 400`); }
+    if (m) {
+      const f = hot && S.cook.meat && S.cook.meat.target ? clamp(S.cook.meat.t / S.cook.meat.target, 0, 1) : hot ? 1 : 0, v = `${(f * 295.3).toFixed(1)} 400`;
+      if (m.getAttribute('stroke-dasharray') !== v) m.setAttribute('stroke-dasharray', v);
+    }
   });
   fitLabels();
 }
@@ -1226,7 +1232,7 @@ function holiday(d) {
 
 // ---- for the app and the tests ----
 window.hub = {
-  returned,
+  returned, renderPods,   // renderPods: the tests check that a poll with nothing new touches nothing
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
   state() {
     const o = { booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() };
