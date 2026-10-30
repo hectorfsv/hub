@@ -186,6 +186,9 @@ body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 .ch.on{color:var(--gold-hot);border-color:var(--gold)}
 .ch.on::before{content:'■ '}
 body.tv #yt-scr.cur{outline:2px solid var(--gold-hot);outline-offset:3px}
+/* the stick: Amazon's WebView puts the video in its own layer under the page and cuts a hole for it, and it cannot cut a
+   rounded one: a rounded clip turned every channel black in the tile, full screen (square) played (measured 10-29) */
+body.tv #yt-scr{border-radius:0}
 #yt-scr.cur::after{content:'SELECT: FULL SCREEN · BACK: STOP';position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;padding:5px 10px;border-radius:5px;background:rgba(11,7,5,.84);font:500 10px var(--mono);letter-spacing:.18em;color:var(--gold-hot);white-space:nowrap;pointer-events:none}
 #news{flex:1;min-height:0;display:flex;flex-direction:column}
 .nh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
@@ -1517,6 +1520,10 @@ doc.addEventListener('keydown', e => {   // capture: it sees a sheet before the 
   else if (e.key === 'Enter') { if (e.target && e.target.tagName === 'INPUT') return; e.preventDefault(); TV.press(); }
   else if (e.key === 'Escape') { if (!S.sheet && YT.playing()) YT.stop(); TV.settle(80); }   // a sheet: its own Escape closes it
 }, true);
+// the YouTube player can take the keyboard (10-29: Back did nothing in full screen, the keys went into the player): take it back
+window.addEventListener('blur', () => setTimeout(() => {
+  const a = doc.activeElement; if (S.tv && a && a.tagName === 'IFRAME') { a.blur(); window.focus(); }
+}, 0));
 
 // ---- start ----
 if (APP) body.classList.add('app');

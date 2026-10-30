@@ -463,6 +463,12 @@ try {
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
     ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
     ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "the Lounge's twelve channels and the YouTube app in the tile");
+    ok((await page.$eval('#yt-scr', e => getComputedStyle(e).borderRadius)) === '0px', 'the tile has square corners (the stick shows no video through a rounded clip: black, 10-29)');
+    const kept = await page.evaluate(async () => {   // a player that takes the keyboard gives it back to the page
+      const f = document.createElement('iframe'); f.srcdoc = '<button>x</button>'; document.body.appendChild(f);
+      await new Promise(r => { f.onload = r; }); f.focus(); f.contentWindow.focus();
+      await new Promise(r => setTimeout(r, 120)); const a = document.activeElement; f.remove(); return a ? a.tagName : null; });
+    ok(kept !== 'IFRAME', `a player that takes the keyboard gives it back to the page (10-29: Back did nothing in full screen; focus on ${kept})`);
     // the remote: it starts on the first app and walks the ring
     ok((await curName()) === 'Netflix', 'the ring starts on the first app');
     ok((await page.textContent('#appname')) === 'NETFLIX' && await page.isVisible('#appname') && !(await page.isVisible('#date')), 'the clock names the app the ring is on');
