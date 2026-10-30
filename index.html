@@ -499,7 +499,7 @@ function layout(force) {
     if (labelSide) Object.assign(l.style, { left: c.x + rp + 16 + 'px', top: c.y - 26 + 'px', width: '210px', transformOrigin: '0 50%' });
     else Object.assign(l.style, { left: c.x - 110 + 'px', top: c.y + rp + 12 + 'px', width: '220px', transformOrigin: '50% 0' });
   });
-  runners(); fitLabels(); renderDay(); placeApps();
+  runners(); fitLabels(); renderDay(); placeApps(); if (typeof fitNews === 'function') fitNews();
   const bl = $('boot-line'), lg = $('boot-log');   // gone once the boot is over
   if (bl) bl.style.top = cy + 'px';
   if (lg) lg.style.top = (land ? cy - 70 : cy + R * .25) + 'px';
@@ -1402,12 +1402,21 @@ const NEWS = {
       a.innerHTML = `<small>${esc(h.src.toUpperCase())}${h.t ? ' · ' + esc(LOUNGE.ago(h.t).toUpperCase()) : ''}</small><span>${esc(h.title)}</span>`;
       box.appendChild(a);
     });
-    const lb = box.getBoundingClientRect().bottom;   // a story that does not fit whole stays out (no half rows)
-    [...box.children].forEach(a => { a.hidden = a.getBoundingClientRect().bottom > lb + 1; });
+    fitNews();
     $('news-at').textContent = NEWS.at ? 'UPDATED ' + hm(new Date(NEWS.at)) : NEWS.items.length ? '' : 'LOADING…';
     if (had >= 0) TV.ring(box.children[Math.min(had, box.children.length - 1)] || null);
   },
 };
+
+// a story that does not fit whole stays out (no half rows). Measured again on every layout and when the page shows again:
+// the stick once hid them all, deciding while the page was hidden behind Netflix (10-29)
+function fitNews() {
+  const box = $('news-l'); if (!box || !S.tv) return;
+  const r = box.getBoundingClientRect(); if (r.height < 40 || doc.hidden) return;   // not measurable now: decide later
+  [...box.children].forEach(a => { a.hidden = false; });
+  [...box.children].forEach(a => { a.hidden = a.getBoundingClientRect().bottom > r.bottom + 1; });
+}
+doc.addEventListener('visibilitychange', () => { if (!doc.hidden) fitNews(); });
 
 // ---- a remote (the Fire TV Stick, 10-29): the arrows move a gold ring by direction, Select presses, the clock is the timer ----
 // The app says `tv` in its services and hands the stick's arrows and Select to this page as ArrowLeft/Right/Up/Down and Enter.

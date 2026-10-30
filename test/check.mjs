@@ -508,7 +508,12 @@ try {
     ok(await page.$eval('#yt', y => !y.classList.contains('full')) && !!(await page.$('#yt-scr iframe')) && await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on')), 'Back: out of full screen, still playing, the ring on the playing channel');
     await page.keyboard.press('Escape');
     ok(!(await page.$('#yt-scr iframe')) && await page.evaluate(() => !document.body.classList.contains('yt-on') && getComputedStyle(document.querySelector('.r-ticks')).animationPlayState === 'running'), 'Back again: it stops, the room moves again');
-    // the news, in his order
+    // the news, in his order; and the list survives a layout made while it could not be measured (the stick, behind Netflix)
+    await page.evaluate(() => { const b = document.getElementById('news-l'); b.style.height = '10px'; window.dispatchEvent(new Event('resize')); });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { document.getElementById('news-l').style.height = ''; window.dispatchEvent(new Event('resize')); });
+    await page.waitForTimeout(400);
+    ok((await page.$$eval('.nw', r => r.filter(e => !e.hidden).length)) >= 3, 'a squeezed layout and back: the stories show again');
     const first = await page.$eval('.nw small', e => e.textContent);
     ok(/^FOX (US|POLITICS)/.test(first), `the news starts with a US story (${first})`);
     await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
