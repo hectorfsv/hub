@@ -322,6 +322,8 @@ body.dimmed .a-wrap,body.dimmed .a-now{opacity:.55}
 'use strict';
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const APP = window.HubsApp || null;            // the Hubs app when this page is its home view; absent on the iPhone
+// the tablet's app sends the keys itself, over its own adb link to the stick: Fire OS drops adb from the stick to itself
+const LANE = APP && typeof APP.press === 'function' && APP.keyState() !== 'none' ? APP : null;
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => { const v = Number(Q.get(k)); return v > 0 ? v : d; };
 // ?idle= and ?dim= (ms) shorten the ambient view and the dimming, for the tests and a quick look
@@ -611,6 +613,12 @@ async function pump() {
     while (NET.q.length) {
       const o = NET.q.shift();
       if (performance.now() - o.at > (o.kind === 'key' ? CFG.stale : CFG.staleOp)) { NET.dropped++; continue; }   // too late to mean anything
+      if (LANE && (o.kind === 'key' || o.kind === 'text')) {
+        const got = o.kind === 'key' ? LANE.press(o.k, o.n) : LANE.type(o.text);
+        if (got === 'ok') { NET.sent++; if (S.adbRefused || S.adb !== 'ok') { S.adbRefused = false; S.adb = 'ok'; renderStatus(); } }
+        else { NET.q = NET.q.filter(x => x.kind !== 'key' && x.kind !== 'text'); adbState(got, true); }
+        continue;
+      }
       const b = o.kind === 'key' ? { k: o.k, n: o.n } : o.kind === 'text' ? { text: o.text } : o.kind === 'launch' ? { pkg: o.pkg } : o.body;
       let r;
       try { r = await call('/api/' + o.kind, b); } catch (e) { NET.dropped += 1 + NET.q.length; NET.q.length = 0; lost(); break; }
@@ -628,6 +636,7 @@ async function pump() {
     }
   } finally { NET.busy = false; }
 }
+window.keyLane = a => { if (LANE) adbState(a, false); };   // the app: its link to the stick changed
 function adbState(a, refused) {
   S.adb = a === 'asking' || a === 'off' ? a : 'ok';
   S.adbRefused = S.adb === 'off' && (!!refused || S.adbRefused);
@@ -710,7 +719,7 @@ function applyState(st) {
   const was = S.front;
   S.front = st.front && typeof st.front === 'object' ? st.front : null;
   S.v = typeof st.v === 'string' ? st.v : S.v;
-  adbState(st.adb, false);
+  adbState(LANE ? LANE.keyState() : st.adb, false);
   if (S.front && !S.front.hub && (!was || was.hub)) { S.yt = null; S.ytFull = false; paintYT(); }   // the HUB left the screen: its video is off
   if (S.front && S.front.pkg && !S.front.hub && APPS.at && !APPS.list.some(a => a.pkg === S.front.pkg) && Date.now() - APPS.at > 60e3) loadApps(true);
   renderNow();

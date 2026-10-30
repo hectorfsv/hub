@@ -34,13 +34,13 @@ const keyCalls = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/a
 const sumKey = (k, from = 0) => keyCalls(from).filter(c => c.body.k === k).reduce((s, c) => s + c.body.n, 0);
 const anyKeyRequest = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/api/key');
 
-async function open(view, { query = '', app = false } = {}) {
+async function open(view, { query = '', app = false, lane = false } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::|ERR_|NetworkError|Load failed|cancelled|aborted/i.test(m.text())) errors.push(m.text()); });
-  await page.addInitScript(([app]) => {
+  await page.addInitScript(([app, lane]) => {
     window.__fetchAt = [];                   // where the page stood when it made each call (the key must already be gone)
     const f = window.fetch.bind(window);
     window.fetch = (input, init) => { window.__fetchAt.push({ url: String((input && input.url) || input), href: location.href }); return f(input, init); };
@@ -51,8 +51,16 @@ async function open(view, { query = '', app = false } = {}) {
         services: () => JSON.stringify({ services: [{ name: 'Lounge' }, { name: 'The Pit' }, { name: 'Home Assistant' }] }),
         open: i => window.__open.push(i),
       };
+      if (lane) {   // the tablet's key lane: press/type answer with the link's state; keyLane() is how the app reports a change
+        window.__lane = { state: 'off', presses: [], texts: [] };
+        Object.assign(window.HubsApp, {
+          keyState: () => window.__lane.state,
+          press: (k, n) => { if (window.__lane.state !== 'ok') return window.__lane.state; window.__lane.presses.push(k + '×' + n); return 'ok'; },
+          type: t => { if (window.__lane.state !== 'ok') return window.__lane.state; window.__lane.texts.push(t); return 'ok'; },
+        });
+      }
     }
-  }, [app]);
+  }, [app, lane]);
   await page.goto(mock.url + '/' + (query ? '?' + query : ''));
   return { ctx, page, errors };
 }
@@ -445,6 +453,31 @@ async function tabletFull() {
       await page.locator('#pit-btn').tap();
       const opened = await page.evaluate(() => window.__open.slice());
       ok(opened.length === 1 && opened[0] === 1, `HubsApp.open asked for index 1 ("The Pit" in the mock services list), got ${JSON.stringify(opened)}`);
+      ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+    } finally { await ctx.close(); }
+  }
+
+  // the tablet's key lane: keys go through the app's own adb link to the stick, never to /api/key
+  console.log(`\n${name}: the tablet's key lane`);
+  mock.reset();
+  {
+    const { ctx, page, errors } = await open('tablet', { query: 'k=' + TOKEN, app: true, lane: true });
+    try {
+      ok(await linked(page), 'linked');
+      const g = (await st(page)).geo;
+      let from = mock.calls.length;
+      await page.touchscreen.tap(...segPt(g, 'up'));
+      ok(await until(page, () => /KEYS RETRYING/.test(document.getElementById('chip').textContent) && !document.getElementById('chip').hidden, 1500),
+        'link off: the first press is refused by the app and the chip says KEYS RETRYING');
+      await page.evaluate(() => { window.__lane.state = 'asking'; keyLane('asking'); });
+      ok(await until(page, () => !document.getElementById('banner').hidden && /PRESS OK ON THE TV ONCE/.test(document.getElementById('banner').textContent), 1500), 'the app says asking: PRESS OK ON THE TV ONCE');
+      await page.evaluate(() => { window.__lane.state = 'ok'; keyLane('ok'); });
+      ok(await until(page, () => document.getElementById('chip').hidden && document.getElementById('banner').hidden, 1500), 'the app says ok: banner and chip go');
+      await page.touchscreen.tap(...segPt(g, 'up'));
+      await page.touchscreen.tap(...segPt(g, 'right'));
+      ok(await until(page, () => window.__lane.presses.length >= 2, 1500), `keys go through the app (${await page.evaluate(() => window.__lane.presses.join(' '))})`);
+      await sleep(300);
+      ok(mock.calls.slice(from).every(c => c.path !== '/api/key' && c.path !== '/api/text'), 'and never to the stick\'s /api/key or /api/text');
       ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     } finally { await ctx.close(); }
   }
