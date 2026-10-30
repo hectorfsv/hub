@@ -79,7 +79,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
       window.__calls = [];
       window.HubsApp = {
         services: () => JSON.stringify({ version: '2.0', tv, services: [
-          { name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true },
+          tv ? { name: '', url: '', mic: false } : { name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true },   // the stick: the Lounge out (10-30)
           { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
           { name: 'Home Assistant', url: '', mic: false }] }),
         open: i => window.__calls.push('open:' + i), talk: () => window.__calls.push('talk'), panel: () => window.__calls.push('panel'), dim: on => window.__calls.push('dim:' + on),
@@ -146,7 +146,7 @@ const beadSweep = page => page.evaluate(() => {
     window.hub.bead(a);
     const b = document.getElementById('bead').getBoundingClientRect(), cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
     if (cx - rad < 0 || cy - rad < 0 || cx + rad > innerWidth || cy + rad > innerHeight) hits.push(a + '°:off screen');
-    g.pods.forEach((p, i) => { if (Math.hypot(cx - p.x, cy - p.y) < rad + g.rp) hits.push(a + '°:pod' + i); });
+    g.pods.forEach((p, i) => { if (p && Math.hypot(cx - p.x, cy - p.y) < rad + g.rp) hits.push(a + '°:pod' + i); });   // an empty slot (the Lounge, 10-30) is null
     for (const [n, r] of rects) { const dx = Math.max(r.left - cx, 0, cx - r.right), dy = Math.max(r.top - cy, 0, cy - r.bottom); if (Math.hypot(dx, dy) < rad) hits.push(a + '°:' + n); }
   }
   window.hub.bead(null);
@@ -215,7 +215,7 @@ try {
     ok(await page.$$eval('#hours .h', h => h.length) === 6, 'six hours ahead');
     ok(/^\d{2}:\d{2}$/.test(await page.textContent('#time')), 'the clock reads HH:MM (24-hour, his setting)');
     ok(await page.isVisible('#chip1'), "the Pit offers 'LINK LIVE COOKS'");
-    ok(st.reach[0] === 'on' && st.reach[1] === 'on' && st.reach[2] === 'unset', 'each service checked (Home not set up)');
+    ok(st.reach[0] === 'unset' && st.reach[1] === 'on' && st.reach[2] === 'unset' && (await page.$$eval('.pod', p => p.length)) === 2, 'the Pit checked, Home not set up, no Lounge pod (out of the HUB, 10-30)');
     ok(!!(await page.$('#gauges path')) && st.air === 70 && !!st.bead, 'the add-ons are on by default: the brackets, the air, the bead');
     checkLayout(await page.evaluate(geometry), view);
     await shot(page, `${view}-browser`);
@@ -462,7 +462,7 @@ try {
     ok(!hits2.length, `tv layout: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
     ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
-    ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "the Lounge's twelve channels and the YouTube app in the tile");
+    ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "twelve channels (10-30: CBS and Canal 5 out, ABC7 LA and Noticias Telemundo in) and the YouTube app in the tile");
     const touched = await page.evaluate(async () => {   // the Pit's poll every minute: with nothing new it must touch nothing
       hub.renderPods(); let n = 0; const mo = new MutationObserver(l => { n += l.length; });
       document.querySelectorAll('.pod, .label').forEach(e => mo.observe(e, { subtree: true, childList: true, attributes: true, characterData: true }));
@@ -499,10 +499,9 @@ try {
     ok(await page.$eval('#sheet', f => f.hidden) && await cur('#clock'), 'Back closes the sheet; the ring is back on the clock');
     await page.keyboard.press('ArrowRight');
     ok(await cur('.pod.pit'), 'Right: the Pit');
-    await page.keyboard.press('ArrowUp');
-    ok(await cur('.pod'), 'Up: the Lounge');
-    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
-    ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Down, Select: the Pit opens in the app');
+    ok((await page.$$eval('.pod', p => p.length)) === 2 && !(await page.$('#label0')), 'two pods on the TV, no Lounge (out of the HUB, 10-30)');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Select: the Pit opens in the app');
     // YouTube
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     const ch = await curName();

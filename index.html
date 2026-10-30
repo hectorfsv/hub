@@ -372,8 +372,8 @@ const DEMO = Q.get('demo') || '';
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const MIN = 60e3;
 const PLACE = { lat: 34.3917, lon: -118.5426, name: 'SANTA CLARITA' };   // the point the Lounge's weather uses
-const DEFAULTS = [
-  { name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true },
+const DEFAULTS = [   // slot 0 was the Lounge: his own space and too heavy for the stick, out of the HUB (Hector 10-30)
+  { name: '', url: '', mic: false },
   { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
   { name: 'Home Assistant', url: '', mic: false },
 ];
@@ -402,7 +402,8 @@ function loadServices() {
   body.classList.toggle('tv', !!S.tv);
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
-    return { i, name: String(s.name || DEFAULTS[i].name), url: String(s.url || ''), mic: !!s.mic };
+    const gone = !s.name && !s.url;   // a slot with no name and no address is not drawn at all
+    return { i, gone, name: String(s.name || DEFAULTS[i].name), url: String(s.url || ''), mic: !!s.mic };
   });
   S.pitIx = S.svc.findIndex(s => /\/the-pit(\/|$)/.test(s.url));
   $('ver').textContent = 'HUB' + (S.version ? ' · APP ' + S.version : '');
@@ -498,9 +499,12 @@ function layout(force) {
   $('orbit-c').setAttribute('r', Ro.toFixed(1));
   const g = $('og'); if (land) { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 1); g.setAttribute('y2', 0); } else { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 0); g.setAttribute('y2', 1); }
   const rn = $('runners'); Object.assign(rn.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
-  S.geo.pods = ang.map(a => ({ x: cx + Ro * Math.cos(a * Math.PI / 180), y: cy + Ro * Math.sin(a * Math.PI / 180) }));
-  doc.querySelectorAll('.pod').forEach((p, i) => {
-    const c = S.geo.pods[i];
+  const vis = S.svc.filter(s => !s.gone).map(s => s.i);   // the pods drawn, spread evenly on the same arc
+  const at = vis.length === 3 ? ang : vis.length === 2 ? [(ang[0] + ang[1]) / 2, (ang[1] + ang[2]) / 2] : [ang[1]];
+  S.geo.pods = [];
+  vis.forEach((i, k) => { S.geo.pods[i] = { x: cx + Ro * Math.cos(at[k] * Math.PI / 180), y: cy + Ro * Math.sin(at[k] * Math.PI / 180) }; });
+  doc.querySelectorAll('.pod').forEach(p => {
+    const i = +p.dataset.i, c = S.geo.pods[i];
     Object.assign(p.style, { left: c.x - rp + 'px', top: c.y - rp + 'px', width: 2 * rp + 'px', height: 2 * rp + 'px' });
     const l = $('label' + i); l.classList.toggle('side', labelSide);
     if (labelSide) Object.assign(l.style, { left: c.x + rp + 16 + 'px', top: c.y - 26 + 'px', width: '210px', transformOrigin: '0 50%' });
@@ -515,8 +519,8 @@ function layout(force) {
 function fitLabels() {
   if (!S.geo) return;
   const W = innerWidth, edge = 10;
-  doc.querySelectorAll('.label').forEach((l, i) => {
-    const c = S.geo.pods[i]; if (!c) return;
+  doc.querySelectorAll('.label').forEach(l => {
+    const c = S.geo.pods[+l.id.slice(5)]; if (!c) return;
     const w = Math.max(0, ...[...l.children].map(e => e.offsetWidth));
     if (S.geo.land) { const left = Math.min(c.x + S.geo.rp + 16, W - edge - w); l.style.left = left + 'px'; return; }
     const mid = clamp(c.x, edge + w / 2, W - edge - w / 2); l.style.left = mid - 110 + 'px';
@@ -541,7 +545,9 @@ function buildPods() {
   const box = $('pods'); box.innerHTML = '';
   doc.querySelectorAll('.label').forEach(l => l.remove());
   S.svc.forEach((s, i) => {
+    if (s.gone) return;
     const p = doc.createElement('div');
+    p.dataset.i = i;
     p.className = 'pod' + (s.url ? '' : ' off') + (i === S.pitIx ? ' pit' : '');
     p.setAttribute('role', 'button'); p.setAttribute('tabindex', s.url ? '0' : '-1'); p.setAttribute('aria-label', s.name);
     const icon = i === S.pitIx || /pit|smok|bbq/i.test(s.name) ? ICON.flame : /home|assistant|house/i.test(s.name) ? ICON.home : ICON.voice;
@@ -575,7 +581,7 @@ function press(el, tap, hold) {
 
 function renderPods() {
   S.svc.forEach((s, i) => {
-    const st = $('st' + i), st2 = $('st2_' + i), pod = doc.querySelectorAll('.pod')[i];
+    const st = $('st' + i), st2 = $('st2_' + i), pod = doc.querySelector(`.pod[data-i="${i}"]`);
     if (!st || !pod) return;
     let a, b = '', hot = false;
     if (!s.url) a = 'NOT SET UP';
@@ -912,7 +918,7 @@ async function boot() {
   const log = $('boot-log'), line = $('boot-line');
   const skip = Q.get('boot') === '0';
   const checks = checkAll(), wx = weather(true);
-  const rows = [['ARC CORE', Promise.resolve('ok')]].concat(S.svc.map((s, i) => [s.name.toUpperCase(), s.url ? checks.then(r => r[i] === 'on' ? 'ok' : 'bad') : Promise.resolve('unset')]),
+  const rows = [['ARC CORE', Promise.resolve('ok')]].concat(S.svc.filter(s => !s.gone).map(s => [s.name.toUpperCase(), s.url ? checks.then(r => r[s.i] === 'on' ? 'ok' : 'bad') : Promise.resolve('unset')]),
     [['WEATHER', wx.then(() => S.wx && !S.wxErr ? 'ok' : 'bad')]]);
   const label = { ok: '<b class="ok">ONLINE</b>', bad: '<b class="bad">NO ANSWER</b>', unset: '<b class="wait">NOT SET UP</b>' };
   const pad = s => (s + ' ').padEnd(17, '·') + ' ';
@@ -1251,9 +1257,9 @@ const LOUNGE = (() => {
   var TV=[
     // United States
     {k:'fox', group:'United States', short:'FOX LiveNOW', note:'Breaking news 24/7', name:'LiveNOW from FOX', vid:'C96oohpWBGw',   /* oNxmNtKwIVA died within a day (YouTube error 150, measured 2026-09-17); C96oohpWBGw played embedded that morning */ page:'https://www.youtube.com/@LiveNOWFOX/live'},
-    {k:'cnn', group:'United States', short:'CNN', note:'CNN Headlines 24/7', name:'CNN Headlines \u00B7 24/7 live news', ch:'UCupvZG-5ko_eiXAupbDfxWw', page:'https://www.youtube.com/@CNN/live'},   // Hector 2026-09-17; the channel-live form plays, so it follows the stream when it restarts
-    {k:'abc', group:'United States', short:'ABC News', note:'ABC News Live 24/7', name:'ABC News Live', vid:'iipR5yUp36o',   /* its channel-live embed answered 150 on 2026-09-17 (it played on 09-15); the video id plays */ page:'https://www.youtube.com/@ABCNews/live'},
-    {k:'cbs', group:'United States', short:'CBS News', note:'CBS News 24/7', name:'CBS News 24/7', ch:'UC8p1vwvWtl6T73JiExfWs1g', page:'https://www.youtube.com/@CBSNews/live'},
+    {k:'cnn', group:'United States', short:'CNN', note:'CNN Headlines 24/7', name:'CNN Headlines \u00B7 24/7 live news', vid:'GotlA1KKWoo', page:'https://www.youtube.com/@CNN/streams'},   // Hector 2026-09-17; 10-30: the channel form answered error 150 while CNN runs two lives, so the video id (a new one comes from @CNN/streams, not /live)
+    {k:'abc', group:'United States', short:'ABC News', note:'ABC News Live 24/7', name:'ABC News Live', vid:'KQhNZQ_Uag8',   /* 10-30: iipR5yUp36o ended 10-24, ABC's new 24/7 id (@ABCNews/live leads to it); the channel form is refused */ page:'https://www.youtube.com/@ABCNews/live'},
+    {k:'abc7', group:'United States', short:'ABC7 LA', note:'Los Angeles news, live', name:'ABC7 Eyewitness News (Los Angeles)', vid:'s3iVFJoxrYc', page:'https://www.youtube.com/@ABC7/live'},   // Hector 2026-10-30; verified live + embeddable 10-29, continuous since 2024-12, video form only
     // World
     {k:'dw', group:'World', short:'DW News', note:'Deutsche Welle, English', name:'DW News livestream', ch:'UCknLrEdhRCp1aegoMqRaCZg', page:'https://www.youtube.com/@dwnews/live'},   // Hector 2026-09-17
     {k:'aje', group:'World', short:'Al Jazeera', note:'Al Jazeera English', name:'Al Jazeera English', vid:'gCNeDWCI0vo', page:'https://www.youtube.com/@aljazeeraenglish/live'},   // in NBC's place (Hector 2026-09-15); its channel-live embed did not play
@@ -1261,8 +1267,9 @@ const LOUNGE = (() => {
     // Mexico
     {k:'azteca', group:'M\u00E9xico', short:'Azteca Noticias', note:'TV Azteca, en vivo', name:'Azteca Noticias en vivo', vid:'0j-UwUPyJO4', page:'https://www.youtube.com/@AztecaNoticias/live'},   // Hector 2026-09-17; Azteca streams a NEW video every day and refuses the channel-live embed, so this id goes stale - the tile says so when it does
     {k:'mmty', group:'M\u00E9xico', short:'Multimedios MTY', note:'Canal 6 Monterrey', name:'Multimedios Monterrey', vid:'SM864ZgPpG8', page:'https://www.youtube.com/@Multimedios/live'},   // the official Multimedios live stream (Hector 2026-09-15)
-    {k:'c5', group:'M\u00E9xico', short:'Canal 5', note:'Me Caigo de Risa 24/7', name:'Canal 5 \u00B7 Me Caigo de Risa 24/7', ch:'UCRZSTf9laa2wkHPOaiOoldA', page:'https://www.youtube.com/@canal5_mx/live'},
+    {k:'ntel', group:'M\u00E9xico', short:'Noticias Telemundo', note:'Noticias 24/7, en espa\u00F1ol', name:'Noticias Telemundo AHORA 24/7', vid:'c660thEPeeY', page:'https://www.youtube.com/@noticias/live'},   // Hector 2026-10-30; verified live + embeddable 10-29, video form only
     // Sports (Hector 2026-09-15 night: "add telemundo deportes, canal 5 24/7, and the MLB" - no league streams live on YouTube)
+    // 10-30 his "get rid of the dead ones, fix the ones that you can": CBS (channel form refused) and Canal 5 (nothing live) out
     {k:'tdep', group:'Sports', short:'Telemundo Deportes', note:'Deportes 24/7, en espa\u00F1ol', name:'Telemundo Deportes Ahora 24/7', vid:'iOdDkZltnJE', page:'https://www.youtube.com/@deportes/live'},
     {k:'lomlb', group:'Sports', short:'Locked On MLB', note:'Baseball talk, not games', name:'Locked On MLB 24/7 (baseball talk, not games)', vid:'BSU7OK-T_LQ', page:'https://www.youtube.com/@LockedOnMLB/live'}];
   var FEEDS=[
