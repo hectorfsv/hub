@@ -47,7 +47,7 @@ let failures = 0;
 const ok = (cond, what) => { if (cond) console.log('  ok  ', what); else { failures++; console.log('  FAIL', what); } };
 
 const browser = await chromium.launch({ executablePath: SHELL });
-async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null, tv = false } = {}) {
+async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null, tv = false, apps = [] } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date(at) });
@@ -65,7 +65,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(READING) });
     return r.fulfill({ status: 404, body: '' });
   });
-  await page.addInitScript(([app, linked, bat, tv]) => {
+  await page.addInitScript(([app, linked, bat, tv, apps]) => {
     // the battery: a stand-in the test can plug in and out; every read is counted
     window.__batCalls = 0;
     const real = navigator.getBattery && navigator.getBattery.bind(navigator);
@@ -83,9 +83,24 @@ async function open(view, { app = false, linked = false, cooking = false, query 
           { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
           { name: 'Home Assistant', url: '', mic: false }] }),
         open: i => window.__calls.push('open:' + i), talk: () => window.__calls.push('talk'), panel: () => window.__calls.push('panel'), dim: on => window.__calls.push('dim:' + on),
+        apps: () => JSON.stringify(apps), launch: pkg => window.__calls.push('launch:' + pkg),
       };
     }
-  }, [app, linked, battery, tv]);
+  }, [app, linked, battery, tv, apps]);
+  if (tv) {   // a TV fetches the Lounge's feeds and plays YouTube: fakes, and a story's page answers 204 so the HUB stays put
+    const rss = items => `<?xml version="1.0"?><rss><channel>${items.map(([t, h]) => `<item><title>${t}</title><link>https://news.test/${encodeURIComponent(t)}</link><pubDate>${new Date(T0 - h * 3600e3).toUTCString()}</pubDate></item>`).join('')}</channel></rss>`;
+    const FEED = { 'moxie.foxnews.com/google-publisher/world.xml': rss([['Israel and Hamas talks resume in Cairo', 1], ['Typhoon nears the Philippines', .5]]),
+      'moxie.foxnews.com/google-publisher/us.xml': rss([['Senate passes the farm bill', 2], ['Wildfire season ends early in California', 3]]),
+      'moxie.foxnews.com/google-publisher/politics.xml': rss([['White House names a new chief of staff', .2]]),
+      'rss.dw.com/rdf/rss-en-all': rss([['Germany debates its budget', .3]]),
+      'www.israelnationalnews.com/Rss.aspx': rss([['Knesset votes on the draft law', 4]]) };
+    await page.route(/^https:\/\/(moxie\.foxnews\.com|rss\.dw\.com|www\.israelnationalnews\.com)\//, r => {
+      const k = Object.keys(FEED).find(x => r.request().url().includes(x));
+      return r.fulfill({ status: 200, contentType: 'application/xml', body: k ? FEED[k] : '<rss/>' });
+    });
+    await page.route('https://www.youtube.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>player</title><body style="background:#300">player</body>' }));
+    await page.route('https://news.test/**', r => { hits.story = r.request().url(); return r.fulfill({ status: 204, body: '' }); });
+  }
   await page.goto(BASE + (query ? '?' + query : ''));
   return { ctx, page, errors, pit, hits };
 }
@@ -411,42 +426,87 @@ try {
     await ctx.close();
   }
 
-  // 11. a TV (the Fire TV Stick, 10-29): the arrows move the ring by direction, Select presses, the clock is the timer
+  // 11. a TV (the Fire TV Stick, 10-29): the apps ring around the clock, the pods, YouTube and the news; the remote walks them all
   {
-    console.log('\ntv: app, the remote');
-    const { ctx, page, errors } = await open('tv', { app: true, tv: true, query: 'boot=0' });
-    await page.waitForTimeout(1500);
+    console.log('\ntv: app, the TV layout and the remote');
+    const ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+    const APPS = ['Netflix', 'Prime Video', 'HBO Max', 'Disney+', 'Hulu', 'Peacock', 'Apple TV', 'YouTube', 'Tubi', 'The Roku Channel', 'Pluto TV', 'Plex', 'Spotify']
+      .map((name, i) => ({ name, pkg: 'pkg.' + i, icon: ICON }));
+    const { ctx, page, errors, hits } = await open('tv', { app: true, tv: true, apps: APPS, query: 'boot=0' });
+    await page.waitForFunction(() => document.querySelectorAll('.nw').length > 0, null, { timeout: 8000 });
+    await page.waitForTimeout(600);
     const cur = sel => page.$eval(sel, e => e.classList.contains('cur'));
+    const curName = () => page.evaluate(() => { const c = document.querySelector('.cur'); return c ? (c.dataset.name || c.dataset.k || c.id || c.className) : null; });
     ok(await page.$eval('body', b => b.classList.contains('tv')), 'the page knows it is on a TV');
-    ok(await cur('.pod.pit'), 'the ring starts on the Pit');
+    // the layout: every app orb, pod, label and tile on screen and clear of the others
+    const g = await page.evaluate(() => {
+      const box = e => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom }; };
+      const txt = l => { const rs = [...l.children].filter(c => c.getClientRects().length).map(box); return { x: Math.min(...rs.map(r => r.x)), y: Math.min(...rs.map(r => r.y)), r: Math.max(...rs.map(r => r.r)), b: Math.max(...rs.map(r => r.b)) }; };
+      const items = [['core', box(document.querySelector('.core'))]];
+      document.querySelectorAll('.tapp').forEach((a, i) => items.push(['app' + i, box(a)]));
+      document.querySelectorAll('.pod').forEach((p, i) => items.push(['pod' + i, box(p)]));
+      document.querySelectorAll('.label').forEach((l, i) => items.push(['label' + i, txt(l)]));
+      for (const id of ['wx', 'hours', 'yt', 'news', 'foot']) items.push([id, box(document.getElementById(id))]);
+      items.push(['greet', txt(document.querySelector('.greet'))]);
+      return { W: innerWidth, H: innerHeight, items };
+    });
+    const off = g.items.filter(([, r]) => r.x < 0 || r.y < 0 || r.r > g.W + .5 || r.b > g.H + .5).map(([n]) => n);
+    ok(!off.length, `tv layout: everything on screen${off.length ? ' (off: ' + off.join(', ') + ')' : ''}`);
+    const hits2 = [];
+    for (let i = 0; i < g.items.length; i++) for (let j = i + 1; j < g.items.length; j++) {
+      const [na, ra] = g.items[i], [nb, rb] = g.items[j];
+      if (/^pod(\d)$/.test(na) && nb === 'label' + na.slice(3)) continue;
+      const ix = Math.min(ra.r, rb.r) - Math.max(ra.x, rb.x), iy = Math.min(ra.b, rb.b) - Math.max(ra.y, rb.y);
+      if (ix > 1 && iy > 1) hits2.push(`${na}×${nb}`);
+    }
+    ok(!hits2.length, `tv layout: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
+    ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
+    ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "the Lounge's twelve channels and the YouTube app in the tile");
+    // the remote: it starts on the first app and walks the ring
+    ok((await curName()) === 'Netflix', 'the ring starts on the first app');
+    ok((await page.textContent('#appname')) === 'NETFLIX' && await page.isVisible('#appname') && !(await page.isVisible('#date')), 'the clock names the app the ring is on');
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+    ok((await curName()) === 'HBO Max', 'Down, Down: along the ring to the third app');
     await page.keyboard.press('ArrowUp');
-    ok(await cur('.pod'), 'Up: the Lounge');
-    await page.keyboard.press('ArrowDown');
-    ok(await cur('.pod.pit'), 'Down: the Pit again');
-    await page.keyboard.press('ArrowDown');
-    ok(await cur('#chip1'), "Down: LINK LIVE COOKS (Home Assistant, not set up, is skipped)");
-    await page.keyboard.press('ArrowDown');
-    ok(await cur('#gear'), 'Down: the gear');
+    ok((await curName()) === 'Prime Video', 'Up: back one');
     await page.keyboard.press('Enter');
-    ok((await page.evaluate(() => window.__calls)).includes('panel'), 'Select on the gear asks the app for the panel');
-    await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
-    ok(await cur('.pod.pit'), 'Up, Up: the chip, then the Pit');
-    await page.keyboard.press('ArrowLeft');
-    ok(await cur('#clock'), 'Left: the clock');
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
-    ok(await page.$eval('#sheet', f => !f.hidden && /KITCHEN TIMER/.test(f.textContent)) && await cur('#sheet [data-min="1"]'), 'Select on the clock: the kitchen timer, the ring on 1 MIN');
+    ok((await page.evaluate(() => window.__calls)).includes('launch:pkg.1'), 'Select on an app asks the app to open it');
+    for (let k = 0; k < 4; k++) await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowRight');
-    ok(await cur('#sheet [data-min="3"]'), 'Right inside the sheet: 3 MIN');
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    ok(await cur('#clock') && await page.isVisible('#date'), 'Right from the ring: the clock (its date back)');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+    ok(await page.$eval('#sheet', f => !f.hidden && /KITCHEN TIMER/.test(f.textContent)) && await cur('#sheet [data-min="1"]'), 'Select on the clock: the kitchen timer, the ring on 1 MIN');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     ok(await page.$eval('#sheet', f => f.hidden) && await cur('#clock'), 'Back closes the sheet; the ring is back on the clock');
     await page.keyboard.press('ArrowRight');
     ok(await cur('.pod.pit'), 'Right: the Pit');
+    await page.keyboard.press('ArrowUp');
+    ok(await cur('.pod'), 'Up: the Lounge');
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Down, Select: the Pit opens in the app');
+    // YouTube
+    await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
+    const ch = await curName();
+    ok(await page.$eval('.cur', e => e.classList.contains('ch')), `Right, Right: into the YouTube channels (${ch})`);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const src = await page.$eval('#yt-scr iframe', f => f.src).catch(() => '');
+    ok(/^https:\/\/www\.youtube\.com\/embed\/.+autoplay=1.+origin=/.test(src) && !/mute=1/.test(src), 'Select plays the channel in the tile, with sound');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(400);
-    ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Select on the Pit opens it in the app');
-    await shot(page, 'tv-remote');
+    ok(await page.$eval('#yt', y => y.classList.contains('full')), 'Select again: full screen');
+    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(200);
+    ok(await page.$eval('#yt', y => y.classList.contains('full')) && (await page.$eval('#yt-scr iframe', f => f.src)) !== src, 'Right in full screen: the next channel, still full screen');
+    await page.keyboard.press('Escape');
+    ok(await page.$eval('#yt', y => !y.classList.contains('full')) && !!(await page.$('#yt-scr iframe')) && await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on')), 'Back: out of full screen, still playing, the ring on the playing channel');
+    await page.keyboard.press('Escape');
+    ok(!(await page.$('#yt-scr iframe')), 'Back again: it stops');
+    // the news, in his order
+    const first = await page.$eval('.nw small', e => e.textContent);
+    ok(/^FOX (US|POLITICS)/.test(first), `the news starts with a US story (${first})`);
+    await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
+    ok(await page.$eval('.cur', e => e.classList.contains('nw')), 'Down from the channels: the news');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    ok(/^https:\/\/news\.test\//.test(hits.story || ''), 'Select on a story opens it (the app shows it on top)');
+    await shot(page, 'tv-layout');
     ok(!errors.length, errs(errors));
     await ctx.close();
   }

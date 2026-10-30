@@ -141,12 +141,54 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 .pod{position:absolute;pointer-events:auto;cursor:pointer;outline:none;transition:transform .14s ease,opacity 1.2s ease}
 /* a remote (the Fire TV Stick, 10-29): the arrows move a gold ring, the cursor (.cur); a keyboard's focus wears the same; a finger never sees either */
 .pod:focus-visible::after,.pod.cur::after{content:'';position:absolute;inset:-9%;border-radius:50%;box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75);pointer-events:none}
-#gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur{outline:2px solid var(--gold-hot);outline-offset:4px}
+#gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur,.ch.cur,.nw.cur{outline:2px solid var(--gold-hot);outline-offset:4px}
+.ch.cur{outline-offset:1px}
 #clock.cur .time{text-shadow:0 0 14px var(--gold-hot),0 0 44px var(--gold)}
 .tv *:focus{outline:none}
 /* the stick's layer diet (10-29, measured: every composited layer costs its chip per frame; 63 layers = 1.9 cores): on a TV the 1-px
    scan line, the three orbit runners and 8 of the 14 motes stay out; the rings, the orbs, the glows and the clock keep moving */
 .tv #scan,.tv .runner,.tv .mote:nth-child(n+7){display:none}
+/* ---- the TV layout (Hector 10-29: "the streaming platforms around the clock", the weather smaller, YouTube under it, the news) ----
+   Only with the app's `tv`; the tablet's layout is untouched. 1443x812 CSS px on the stick. */
+#apps,#tvcol,#appname{display:none}
+body.tv #apps{display:block;position:absolute;inset:0;pointer-events:none;z-index:4}
+.tapp{position:absolute;pointer-events:auto;border-radius:50%;overflow:hidden;background:#100A07;box-shadow:0 0 0 1.5px rgba(255,181,71,.42),0 0 14px rgba(255,181,71,.16);transition:transform .14s ease}
+.tapp img{display:block;width:100%;height:100%;object-fit:cover;filter:saturate(.45) brightness(.72)}
+.tapp.cur{transform:scale(1.16);box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75)}
+.tapp.cur img{filter:none}
+body.tv-app #date{display:none}
+body.tv-app #appname{display:block;color:var(--gold-hot)}
+body.boot #apps{opacity:0}
+body.tv.land #bottom{left:var(--tvL);right:24px;width:auto;top:104px;bottom:14px}
+body.tv.land #hours{flex-direction:row;gap:0;margin-bottom:12px}
+body.tv.land .h{display:block;text-align:center}
+body.tv.land .h svg{width:20px;height:20px;margin:4px auto 2px}
+body.tv.land .h b{text-align:center;font-size:18px}
+body.tv.land .h i{display:none}
+body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
+#yt-scr{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0B0705;border:1px solid rgba(255,181,71,.26)}
+#yt-scr iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#yt-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center}
+#yt-idle b{font-family:var(--word);font-weight:400;font-size:28px;letter-spacing:.14em;color:var(--gold-hot)}
+#yt-idle span{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim)}
+#yt-ch{display:flex;gap:8px;margin-top:5px;padding:4px;overflow:hidden}
+.ch{flex:none;padding:7px 11px;border-radius:6px;border:1px solid rgba(255,181,71,.28);background:none;font:500 10.5px var(--mono);letter-spacing:.14em;color:var(--dim);white-space:nowrap}
+.ch.on{color:var(--gold-hot);border-color:var(--gold)}
+#news{flex:1;min-height:0;display:flex;flex-direction:column}
+.nh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.nh b{font-family:var(--word);font-weight:400;font-size:20px;letter-spacing:.16em;color:var(--gold)}
+.nh span{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--faint)}
+#news-l{flex:1;min-height:0;overflow:hidden}
+.nw{display:block;padding:7px 10px;border-radius:6px;text-decoration:none;color:var(--ink)}
+.nw small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--gold);margin-bottom:3px}
+.nw span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.3}
+.nw[hidden]{display:none}
+.nw.cur{background:rgba(255,181,71,.08)}
+body.tv #yt.full{position:fixed;inset:0;z-index:80;background:#000}
+body.tv #yt.full #yt-scr{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}
+body.tv #yt.full #yt-ch{display:none}
+body.yt-full #reactor,body.yt-full #pods,body.yt-full #apps,body.yt-full #orbit,body.yt-full #motes,body.yt-full #embers,body.yt-full #top,body.yt-full .label{visibility:hidden}
+body.yt-full .spin,body.yt-full .orb,body.yt-full .glow,body.yt-full .halo,body.yt-full .pulse,body.yt-full .fg,body.yt-full .pt{animation-play-state:paused}
 .pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pod .glow{inset:-48%;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.08) 38%,transparent 64%);will-change:opacity;animation:breathe 4.6s ease-in-out infinite alternate}
 .pod .orb{inset:-15%;will-change:transform;animation:rot 28s linear infinite}
@@ -286,13 +328,15 @@ body.dim #scan,body.dim #motes{display:none}
   <div class="core"></div>
   <div class="pulse"></div>
   <div class="spin r-sec" id="sec"><i></i></div>
-  <div class="clock" id="clock"><div class="time" id="time">--:--</div><div class="date" id="date"></div></div>
+  <div class="clock" id="clock"><div class="time" id="time">--:--</div><div class="date" id="date"></div><div class="date" id="appname"></div></div>
 </div>
 <div id="pods"></div>
+<div id="apps" aria-label="Apps"></div>
 <header id="top"><div class="greet"><b id="greet"></b><span id="sun"></span></div><div class="wx" id="wx"></div></header>
 <footer id="bottom">
   <div id="hours"></div>
   <div id="cook"><div class="ck1"><b id="ck-name">COOK</b><span id="ck-phase"></span></div><div class="ck2" id="ck-read"></div><div class="bar"><i id="ck-bar"></i></div></div>
+  <div id="tvcol"><div id="yt"><div id="yt-scr"><div id="yt-idle"><b id="yt-name">YOUTUBE</b><span id="yt-hint">PICK A CHANNEL BELOW</span></div></div><div id="yt-ch"></div></div><div id="news"><div class="nh"><b>NEWS</b><span id="news-at"></span></div><div id="news-l"></div></div></div>
   <div id="foot"><span id="net">ONLINE</span><span id="ver">HUB</span><button id="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg></button></div>
 </footer>
 <div id="corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -403,7 +447,7 @@ function layout(force) {
   if (S.sheet && !force && S.geo && S.geo.W === W) return;   // the keyboard is up for the sheet: keep everything still
   const land = W > H * 1.1;
   body.classList.toggle('land', land);
-  let R, cx, cy, Ro, rp, ang, labelSide;
+  let R, cx, cy, Ro, rp, ang, labelSide, Ra = 0, ra = 0;
   if (!land) {
     const topH = 92, botH = 16 + 126, labelH = 74;
     R = Math.min(W * .36, (H - topH - 12 - 12 - labelH - 10 - botH) / 2.77, 250);
@@ -412,17 +456,23 @@ function layout(force) {
     const lo = topH + 12 + R, hi = H - botH - 10 - labelH - 12 - rp - Ro;
     cy = hi > lo ? (lo + hi) / 2 : lo;
     ang = [130, 90, 50]; labelSide = false;
+  } else if (S.tv) {   // a TV: the apps ring around the clock, the pods beyond it, YouTube and the news in a column on the right
+    R = Math.min(H * .245, 200);
+    Ro = R * 1.66; rp = R * .28; Ra = R * 1.24; ra = R * .135;
+    cx = Ra + ra + 34; cy = H / 2 + 14;
+    ang = [-40, 0, 40]; labelSide = true;
   } else {
     R = Math.min(H * .32, W * .2, 240);
     Ro = R * 1.38; rp = R * .28;
     cx = Math.max(R * 1.05, W * .2); cy = H / 2 + 8;
     ang = [-42, 0, 42]; labelSide = true;
   }
-  S.geo = { W, H, R, cx, cy, Ro, rp, land };
+  S.geo = { W, H, R, cx, cy, Ro, rp, land, Ra, ra };
   const st = doc.documentElement.style;
   st.setProperty('--R', R.toFixed(1) + 'px'); st.setProperty('--rp', rp.toFixed(1) + 'px');
   st.setProperty('--bgY', (cy / H * 100).toFixed(1) + '%');
   if (land) { st.setProperty('--colL', (cx + R * .9) + 'px'); st.setProperty('--colW', Math.max(170, W - (cx + Ro + rp + 200)) + 'px'); }
+  if (land && S.tv) st.setProperty('--tvL', (cx + Ro + rp + 16 + 210 + 18).toFixed(1) + 'px');
   const r = $('reactor'); Object.assign(r.style, { left: cx - R + 'px', top: cy - R + 'px', width: 2 * R + 'px', height: 2 * R + 'px' });
   const o = $('orbit'); Object.assign(o.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
   o.setAttribute('viewBox', `${-Ro} ${-Ro} ${2 * Ro} ${2 * Ro}`);
@@ -437,7 +487,7 @@ function layout(force) {
     if (labelSide) Object.assign(l.style, { left: c.x + rp + 16 + 'px', top: c.y - 26 + 'px', width: '210px', transformOrigin: '0 50%' });
     else Object.assign(l.style, { left: c.x - 110 + 'px', top: c.y + rp + 12 + 'px', width: '220px', transformOrigin: '50% 0' });
   });
-  runners(); fitLabels(); renderDay();
+  runners(); fitLabels(); renderDay(); placeApps();
   const bl = $('boot-line'), lg = $('boot-log');   // gone once the boot is over
   if (bl) bl.style.top = cy + 'px';
   if (lg) lg.style.top = (land ? cy - 70 : cy + R * .25) + 'px';
@@ -522,11 +572,12 @@ function renderPods() {
     st.innerHTML = a;
     st2.hidden = !b; st2.innerHTML = b;
     pod.classList.toggle('hot', hot);
-    const old = $('chip' + i); if (old) old.remove();
+    const old = $('chip' + i), hadRing = !!(old && old.classList.contains('cur')); if (old) old.remove();
     if (i === S.pitIx && s.url && S.pit === 'unlinked' && S.reach[i] !== 'off') {
       const c = doc.createElement('span'); c.className = 'chip'; c.id = 'chip' + i; c.textContent = 'LINK LIVE COOKS';
       c.addEventListener('click', e => { e.stopPropagation(); openSheet(); });
       $('label' + i).appendChild(c);
+      if (hadRing) { c.classList.add('cur'); try { TV.cur = c; } catch (x) { /* before the remote's code exists */ } }
     }
     const m = $('meter' + i);
     if (m) { const f = hot && S.cook.meat && S.cook.meat.target ? clamp(S.cook.meat.t / S.cook.meat.target, 0, 1) : hot ? 1 : 0; m.setAttribute('stroke-dasharray', `${(f * 295.3).toFixed(1)} 400`); }
@@ -810,6 +861,7 @@ function motes() {
 
 // ---- night: a minute untouched after sunset, the screen dims to the reactor ----
 function idleTick() {
+  if (S.tv) return;
   const quiet = Date.now() - S.idleAt > (DEMO === 'night' ? 4000 : 60000);
   if (isNight() && quiet && !doc.hidden && !S.sheet && !S.launching && !S.dimmed && !S.alarm) {
     S.dimmed = true; body.classList.add('dim'); if (APP) APP.dim(true);
@@ -1154,32 +1206,225 @@ window.hub = {
   demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
 
+Object.assign(window.hub, { appsReady() { APPS.load(); } });   // the app built its list of a TV's apps (after the page loaded)
 Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare, chime() { audioOn(); chime(); } });
+
+// ---- the Lounge's TV channels and news, copied word for word from projects/lounge/index.html (10-29) so both screens
+// play and rank the same way: his order of interest is in newsRank (US, then Israel and the Middle East, then Mexico) ----
+const LOUNGE = (() => {
+  var TV=[
+    // United States
+    {k:'fox', group:'United States', short:'FOX LiveNOW', note:'Breaking news 24/7', name:'LiveNOW from FOX', vid:'C96oohpWBGw',   /* oNxmNtKwIVA died within a day (YouTube error 150, measured 2026-09-17); C96oohpWBGw played embedded that morning */ page:'https://www.youtube.com/@LiveNOWFOX/live'},
+    {k:'cnn', group:'United States', short:'CNN', note:'CNN Headlines 24/7', name:'CNN Headlines \u00B7 24/7 live news', ch:'UCupvZG-5ko_eiXAupbDfxWw', page:'https://www.youtube.com/@CNN/live'},   // Hector 2026-09-17; the channel-live form plays, so it follows the stream when it restarts
+    {k:'abc', group:'United States', short:'ABC News', note:'ABC News Live 24/7', name:'ABC News Live', vid:'iipR5yUp36o',   /* its channel-live embed answered 150 on 2026-09-17 (it played on 09-15); the video id plays */ page:'https://www.youtube.com/@ABCNews/live'},
+    {k:'cbs', group:'United States', short:'CBS News', note:'CBS News 24/7', name:'CBS News 24/7', ch:'UC8p1vwvWtl6T73JiExfWs1g', page:'https://www.youtube.com/@CBSNews/live'},
+    // World
+    {k:'dw', group:'World', short:'DW News', note:'Deutsche Welle, English', name:'DW News livestream', ch:'UCknLrEdhRCp1aegoMqRaCZg', page:'https://www.youtube.com/@dwnews/live'},   // Hector 2026-09-17
+    {k:'aje', group:'World', short:'Al Jazeera', note:'Al Jazeera English', name:'Al Jazeera English', vid:'gCNeDWCI0vo', page:'https://www.youtube.com/@aljazeeraenglish/live'},   // in NBC's place (Hector 2026-09-15); its channel-live embed did not play
+    {k:'bbg', group:'World', short:'Bloomberg', note:'Markets and business', name:'Bloomberg', ch:'UCIALMKvObZNtJ6AmdCLP7Lg', page:'https://www.youtube.com/@markets/live'},
+    // Mexico
+    {k:'azteca', group:'M\u00E9xico', short:'Azteca Noticias', note:'TV Azteca, en vivo', name:'Azteca Noticias en vivo', vid:'0j-UwUPyJO4', page:'https://www.youtube.com/@AztecaNoticias/live'},   // Hector 2026-09-17; Azteca streams a NEW video every day and refuses the channel-live embed, so this id goes stale - the tile says so when it does
+    {k:'mmty', group:'M\u00E9xico', short:'Multimedios MTY', note:'Canal 6 Monterrey', name:'Multimedios Monterrey', vid:'SM864ZgPpG8', page:'https://www.youtube.com/@Multimedios/live'},   // the official Multimedios live stream (Hector 2026-09-15)
+    {k:'c5', group:'M\u00E9xico', short:'Canal 5', note:'Me Caigo de Risa 24/7', name:'Canal 5 \u00B7 Me Caigo de Risa 24/7', ch:'UCRZSTf9laa2wkHPOaiOoldA', page:'https://www.youtube.com/@canal5_mx/live'},
+    // Sports (Hector 2026-09-15 night: "add telemundo deportes, canal 5 24/7, and the MLB" - no league streams live on YouTube)
+    {k:'tdep', group:'Sports', short:'Telemundo Deportes', note:'Deportes 24/7, en espa\u00F1ol', name:'Telemundo Deportes Ahora 24/7', vid:'iOdDkZltnJE', page:'https://www.youtube.com/@deportes/live'},
+    {k:'lomlb', group:'Sports', short:'Locked On MLB', note:'Baseball talk, not games', name:'Locked On MLB 24/7 (baseball talk, not games)', vid:'BSU7OK-T_LQ', page:'https://www.youtube.com/@LockedOnMLB/live'}];
+  var FEEDS=[
+    {k:'fox',    src:'Fox News',     url:'https://moxie.foxnews.com/google-publisher/world.xml'},
+    {k:'foxus',  src:'Fox US',       url:'https://moxie.foxnews.com/google-publisher/us.xml'},
+    {k:'foxpol', src:'Fox Politics', url:'https://moxie.foxnews.com/google-publisher/politics.xml'},
+    {k:'dw',     src:'DW',           url:'https://rss.dw.com/rdf/rss-en-all'},
+    {k:'arutz',  src:'Arutz Sheva',  url:'https://www.israelnationalnews.com/Rss.aspx'}
+  ];
+  var FOCUS_US=0, FOCUS_ME=1, FOCUS_MX=2, FOCUS_REST=3;
+  var FOCUS_SRC={'Fox US':FOCUS_US, 'Fox Politics':FOCUS_US, 'Jerusalem Post':FOCUS_ME, 'Arutz Sheva':FOCUS_ME, 'Times of Israel':FOCUS_ME, 'Mexico News Daily':FOCUS_MX};
+  var FOCUS_WORDS=[
+    [FOCUS_US, /\b(United States|Americans?|American|Washington|White House|Trump|Vance|Congress|Senate|House Republicans?|House Democrats?|Supreme Court|Pentagon|State Department|Homeland Security|National Guard|Republicans?|Democrats?|Congressman|Senator|Governor|California|Texas|Florida|New York|Chicago|Los Angeles|Wall Street|Federal Reserve)\b/i],
+    [FOCUS_US, /\b(U\.S\.|US|USA|GOP|FBI|CIA|DOJ|ICE|IRS|CDC|NASA|Fed)\b/],
+    [FOCUS_ME, /\b(Israel|Israeli|Israelis|Gaza|Hamas|Hezbollah|IDF|Netanyahu|West Bank|Jerusalem|Tel Aviv|Iran|Iranian|Tehran|Lebanon|Beirut|Syria|Damascus|Yemen|Houthis?|Saudi|Riyadh|Qatar|Doha|Emirates|Dubai|Egypt|Cairo|Jordan|Middle East|Hormuz)\b/i],
+    [FOCUS_MX, /\b(Mexico|M\u00E9xico|Mexican|Mexicans|Sheinbaum|cartel|cartels|CJNG|Sinaloa|Tijuana|Ju\u00E1rez|Monterrey|Guadalajara|Oaxaca|Canc\u00FAn|Cancun|Yucat\u00E1n|Quintana Roo|Michoac\u00E1n)\b/i]];
+  function newsRank(h){
+    var src=(h && h.src) || '', r=Object.prototype.hasOwnProperty.call(FOCUS_SRC, src) ? FOCUS_SRC[src] : FOCUS_REST;
+    var t=String((h && h.title) || '');
+    for(var i=0;i<FOCUS_WORDS.length;i++) if(FOCUS_WORDS[i][0]<r && FOCUS_WORDS[i][1].test(t)) r=FOCUS_WORDS[i][0];
+    return r;
+  }
+  var FOCUS_TAG=['US','ME','MX',''];
+  function webLink(s){ return /^https?:\/\//i.test(String(s||'')) }
+  function ago(t){
+    var ms=Date.now()-Date.parse(t); if(!isFinite(ms) || ms<0) return '';
+    var m=Math.max(0,Math.round(ms/60000));
+    return m<60 ? m+'m' : m<1440 ? Math.round(m/60)+'h' : Math.round(m/1440)+'d';
+  }
+  function feedItems(x, f){
+    var doc=new DOMParser().parseFromString(x,'application/xml'), out=[];
+    [].slice.call(doc.getElementsByTagName('item'), 0, 10).forEach(function(it){
+      function g(n){ var e=it.getElementsByTagName(n)[0]; return e ? e.textContent.trim() : '' }
+      function dc(){   // DW's RDF feed: the date is dc:date, and a namespaced tag is not found by plain name everywhere
+        var e=it.getElementsByTagName('dc:date')[0];
+        if(!e && it.getElementsByTagNameNS) e=it.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/','date')[0];
+        return e ? e.textContent.trim() : '';
+      }
+      var title=g('title'), link=g('link')||g('guid'), at=Date.parse(g('pubDate') || dc());
+      if(title && webLink(link) && out.length<4) out.push({src:f.src, title:title.slice(0,220), link:link, t:isFinite(at)?new Date(at).toISOString():null});
+    });
+    return out;
+    return out;
+  }
+  return { TV, FEEDS, newsRank, feedItems, ago };
+})();
+
+// ---- a TV's apps: the ring around the clock. The app lists them (its own icons) and launches them; Back in an app returns here ----
+const APPS = {
+  list: [],
+  load() {
+    if (!S.tv || !APP || !APP.apps) return;
+    let l = []; try { l = JSON.parse(APP.apps()); } catch (e) { l = []; }
+    APPS.list = Array.isArray(l) ? l.filter(a => a && typeof a.pkg === 'string' && typeof a.name === 'string').slice(0, 16) : [];
+    const box = $('apps'); box.innerHTML = '';
+    APPS.list.forEach(a => {
+      const d = doc.createElement('div'); d.className = 'tapp'; d.setAttribute('role', 'button'); d.setAttribute('aria-label', a.name);
+      d.dataset.pkg = a.pkg; d.dataset.name = a.name;
+      if (/^data:image\/png;base64,/.test(a.icon || '')) { const im = doc.createElement('img'); im.alt = ''; im.src = a.icon; d.appendChild(im); }
+      d.addEventListener('click', () => { if (APP && APP.launch) APP.launch(a.pkg); });
+      box.appendChild(d);
+    });
+    placeApps();
+    if (!TV.cur || !TV.targets().includes(TV.cur)) TV.home();
+  },
+};
+// on the left of the clock, top to bottom, at most 24 degrees apart (240 at most, clear of the pods on the right)
+function placeApps() {
+  const g = S.geo, els = [...$('apps').children];
+  if (!S.tv || !g || !g.land || !els.length) return;
+  const n = els.length, step = n > 1 ? Math.min(24, 240 / (n - 1)) : 0, start = -180 + step * (n - 1) / 2;
+  g.apps = els.map((el, k) => {
+    const t = (start - k * step) * Math.PI / 180, x = g.cx + g.Ra * Math.cos(t), y = g.cy + g.Ra * Math.sin(t);
+    Object.assign(el.style, { left: x - g.ra + 'px', top: y - g.ra + 'px', width: 2 * g.ra + 'px', height: 2 * g.ra + 'px' });
+    return { x, y };
+  });
+}
+
+// ---- YouTube on a TV: the Lounge's channels in a tile; Select plays, Select again fills the screen, Back steps back; search is the YouTube app ----
+const YT = {
+  k: null, full: false,
+  build() {
+    const box = $('yt-ch'); box.innerHTML = '';
+    LOUNGE.TV.forEach(c => {
+      const b = doc.createElement('button'); b.type = 'button'; b.className = 'ch'; b.dataset.k = c.k; b.textContent = c.short.toUpperCase();
+      b.addEventListener('click', () => YT.pick(c.k)); box.appendChild(b);
+    });
+    const y = doc.createElement('button'); y.type = 'button'; y.className = 'ch'; y.dataset.k = 'app'; y.textContent = 'YOUTUBE APP ▸';
+    y.addEventListener('click', () => { YT.stop(); if (APP && APP.launch) APP.launch('com.amazon.firetv.youtube'); }); box.appendChild(y);
+    YT.paint();
+  },
+  src(c) {
+    return 'https://www.youtube.com/embed/' + (c.vid ? c.vid + '?' : 'live_stream?channel=' + c.ch + '&') + 'autoplay=1&playsinline=1&rel=0&enablejsapi=1'
+      + '&origin=' + encodeURIComponent(location.origin);
+  },
+  playing() { return !!$('yt-scr').querySelector('iframe'); },
+  pick(k) {
+    if (YT.k === k && YT.playing()) { YT.setFull(!YT.full); return; }
+    const c = LOUNGE.TV.find(x => x.k === k); if (!c) return;
+    YT.stop();
+    const f = doc.createElement('iframe'); f.title = c.name;
+    f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+    f.referrerPolicy = 'strict-origin-when-cross-origin';   // YouTube refuses embeds that do not say which site they are on (the Lounge's lesson)
+    f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), 'https://www.youtube.com'); } catch (e) { /* not ready */ } });
+    f.src = YT.src(c); $('yt-scr').appendChild(f); YT.k = k; YT.paint();
+  },
+  stop() { const f = $('yt-scr').querySelector('iframe'); if (f) f.remove(); YT.setFull(false); YT.k = null; YT.paint(); },
+  setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); },
+  next(d) {
+    const l = LOUNGE.TV, i = l.findIndex(x => x.k === YT.k), was = YT.full;
+    YT.pick(l[(i + d + l.length) % l.length].k); YT.setFull(was);
+  },
+  paint(hint) {
+    const c = LOUNGE.TV.find(x => x.k === YT.k);
+    doc.querySelectorAll('#yt-ch .ch').forEach(b => b.classList.toggle('on', b.dataset.k === YT.k));
+    $('yt-idle').hidden = YT.playing();
+    $('yt-name').textContent = c ? c.short.toUpperCase() : 'YOUTUBE';
+    $('yt-hint').textContent = hint || 'PICK A CHANNEL BELOW · SELECT AGAIN FOR FULL SCREEN';
+  },
+};
+window.addEventListener('message', e => {   // the player says when a stream has ended (a channel's video id goes stale: the Lounge's 09-17 lesson)
+  const f = $('yt-scr').querySelector('iframe'); if (!f || e.source !== f.contentWindow) return;
+  let d = null; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+  const err = d && (d.event === 'onError' ? d.info : d.info && d.info.errorCode);
+  if (err) { const name = $('yt-name').textContent; YT.stop(); YT.paint(`${name} HAS ENDED (YOUTUBE ${err}) · PICK ANOTHER`); }
+});
+
+// ---- the news on a TV: the Lounge's five free feeds read by this page (0 n8n runs), his order of interest first ----
+const NEWS = {
+  items: [], at: 0,
+  async load() {
+    if (!S.tv || NEWS.busy) return;
+    NEWS.busy = true;
+    const got = [];
+    await Promise.all(LOUNGE.FEEDS.map(f => fetchT(f.url, 12000).then(r => r.ok ? r.text() : '').then(x => { if (x) got.push(...LOUNGE.feedItems(x, f)); }).catch(() => {})));
+    NEWS.busy = false;
+    if (got.length) {
+      const seen = new Set(), t = h => Date.parse(h.t || '') || 0;
+      NEWS.items = got.filter(h => !seen.has(h.title) && seen.add(h.title)).sort((a, b) => LOUNGE.newsRank(a) - LOUNGE.newsRank(b) || t(b) - t(a));
+      NEWS.at = Date.now();
+    }
+    NEWS.paint();
+  },
+  paint() {
+    const box = $('news-l'), had = TV.cur && TV.cur.classList.contains('nw') ? [...box.children].indexOf(TV.cur) : -1;
+    box.innerHTML = '';
+    NEWS.items.slice(0, 8).forEach(h => {
+      const a = doc.createElement('a'); a.className = 'nw'; a.href = h.link;
+      a.innerHTML = `<small>${esc(h.src.toUpperCase())}${h.t ? ' · ' + esc(LOUNGE.ago(h.t).toUpperCase()) : ''}</small><span>${esc(h.title)}</span>`;
+      box.appendChild(a);
+    });
+    const lb = box.getBoundingClientRect().bottom;   // a story that does not fit whole stays out (no half rows)
+    [...box.children].forEach(a => { a.hidden = a.getBoundingClientRect().bottom > lb + 1; });
+    $('news-at').textContent = NEWS.at ? 'UPDATED ' + hm(new Date(NEWS.at)) : NEWS.items.length ? '' : 'LOADING…';
+    if (had >= 0) TV.ring(box.children[Math.min(had, box.children.length - 1)] || null);
+  },
+};
 
 // ---- a remote (the Fire TV Stick, 10-29): the arrows move a gold ring by direction, Select presses, the clock is the timer ----
 // The app says `tv` in its services and hands the stick's arrows and Select to this page as ArrowLeft/Right/Up/Down and Enter.
-// The ring walks the pods, the link chip, the clock and the gear; inside a sheet, that sheet's buttons and fields.
+// The ring walks the apps (Up/Down along their ring), the clock, the pods, the link chip, the YouTube channels, the news and the
+// gear; inside a sheet, that sheet's buttons and fields. YouTube full screen: Left/Right change the channel, Back leaves it.
 const TV = {
   cur: null, back: null,
   targets() {
     const shown = e => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
     if (S.sheet) return [...$('sheet').querySelectorAll('button:not([disabled]),input')].filter(shown);
-    return [...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'), $('gear')].filter(shown);
+    const nl = $('news-l').getBoundingClientRect();
+    const rows = [...doc.querySelectorAll('.nw')].filter(e => !e.hidden && e.getBoundingClientRect().bottom <= nl.bottom + 1);   // only rows that fit
+    return [...doc.querySelectorAll('.tapp'), ...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'),
+      ...doc.querySelectorAll('#yt-ch .ch'), ...rows, $('gear')].filter(shown);
   },
   ring(el) {
     if (TV.cur) TV.cur.classList.remove('cur');
     TV.cur = el || null;
+    const app = !!(el && el.classList.contains('tapp'));
+    body.classList.toggle('tv-app', app); $('appname').textContent = app ? el.dataset.name.toUpperCase() : '';
     if (!el) return;
     el.classList.add('cur');
+    if (el.classList.contains('ch')) { const box = $('yt-ch'), r = el.offsetLeft + el.offsetWidth / 2 - box.clientWidth / 2; box.scrollLeft = Math.max(0, r); }
     if (el.tagName === 'INPUT') el.focus(); else if (doc.activeElement && doc.activeElement.tagName === 'INPUT') doc.activeElement.blur();
   },
-  home() { const t = TV.targets(); TV.ring(t.find(e => e.classList.contains('pit')) || t[0] || null); },
+  home() {
+    const t = TV.targets(), pit = t.find(e => e.classList.contains('pit'));
+    TV.ring((S.cook && pit) || t.find(e => e.classList.contains('tapp')) || pit || t[0] || null);
+  },
   move(dx, dy) {
     const t = TV.targets(); if (!t.length) return;
     if (!TV.cur || !t.includes(TV.cur)) { TV.settle(0); return; }
+    if (TV.cur.classList.contains('tapp')) {   // on the apps ring: Up and Down walk it; Left is its outside
+      const apps = t.filter(e => e.classList.contains('tapp')), i = apps.indexOf(TV.cur);
+      if (dy) { const n = apps[i + (dy > 0 ? 1 : -1)]; if (n) TV.ring(n); return; }
+      if (dx < 0) return;
+    }
+    const fromApp = TV.cur.classList.contains('tapp');
     const c = TV.mid(TV.cur); let best = null, score = Infinity;
     for (const e of t) {
-      if (e === TV.cur) continue;
+      if (e === TV.cur || (fromApp && e.classList.contains('tapp'))) continue;
       const m = TV.mid(e), vx = m.x - c.x, vy = m.y - c.y, along = vx * dx + vy * dy;
       if (along <= 8) continue;                              // not in the arrow's direction
       const s = along + Math.abs(vx * dy - vy * dx) * 2.2;    // the nearer, and the closer to the arrow's line, the better
@@ -1197,6 +1442,7 @@ const TV = {
   /** After a press or Back: a sheet may have opened or closed; the ring lands on the right thing. */
   settle(ms) {
     setTimeout(() => {
+      if (YT.full) return;                                    // full screen: the ring waits under the picture
       const t = TV.targets();
       if (TV.cur && t.includes(TV.cur)) return;
       TV.ring(t.includes(TV.back) ? TV.back : t.find(e => e.classList.contains('pit')) || t[0] || null);
@@ -1204,18 +1450,27 @@ const TV = {
   },
   mid(e) { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
 };
-doc.addEventListener('keydown', e => {
+doc.addEventListener('keydown', e => {   // capture: it sees a sheet before the sheet's own Escape closes it
   if (!S.tv) return;
   const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-  if (d) { e.preventDefault(); wake(); TV.move(d[0], d[1]); }
-  else if (e.key === 'Enter') { if (e.target && e.target.tagName === 'INPUT') return; e.preventDefault(); wake(); TV.press(); }
-  else if (e.key === 'Escape') TV.settle(80);                 // the sheet's own Escape handler closed it
-});
+  if (YT.full) {                                              // full screen: Left/Right change the channel, Back leaves, the rest waits
+    if (e.key === 'Escape') { YT.setFull(false); const c = doc.querySelector(`#yt-ch .ch[data-k="${YT.k}"]`); if (c) TV.ring(c); return; }
+    e.preventDefault();
+    if (d && d[0]) YT.next(d[0]);
+    return;
+  }
+  if (d) { e.preventDefault(); TV.move(d[0], d[1]); }
+  else if (e.key === 'Enter') { if (e.target && e.target.tagName === 'INPUT') return; e.preventDefault(); TV.press(); }
+  else if (e.key === 'Escape') { if (!S.sheet && YT.playing()) YT.stop(); TV.settle(80); }   // a sheet: its own Escape closes it
+}, true);
 
 // ---- start ----
 if (APP) body.classList.add('app');
 loadServices(); drawRings(); buildPods(); layout(true);
-if (S.tv) TV.home();
+if (S.tv) {
+  YT.build(); APPS.load(); NEWS.paint(); NEWS.load(); TV.home();
+  setInterval(() => { if (!doc.hidden) NEWS.load(); }, 15 * 60e3);
+}
 addOns();
 S.wx = store.get('hub.wx'); renderWx(); tick(); motes();
 setInterval(idleTick, 5000);
