@@ -148,6 +148,9 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 /* the stick's layer diet (10-29, measured: every composited layer costs its chip per frame; 63 layers = 1.9 cores): on a TV the 1-px
    scan line, the three orbit runners and 8 of the 14 motes stay out; the rings, the orbs, the glows and the clock keep moving */
 .tv #scan,.tv .runner,.tv .mote:nth-child(n+7){display:none}
+/* the stick's WebView draws SVG text under 8 units out of place (the power and air labels jumped into the clock's name line;
+   measured 10-29: 6.4 broken with or without its 8-px minimum font, 8.4 right): on a TV they are 8.4 */
+.tv .g-lab,.tv #tm-txt{font-size:8.4px}
 /* ---- the TV layout (Hector 10-29: "the streaming platforms around the clock", the weather smaller, YouTube under it, the news) ----
    Only with the app's `tv`; the tablet's layout is untouched. 1443x812 CSS px on the stick. */
 #apps,#tvcol,#appname{display:none}
@@ -188,7 +191,9 @@ body.tv #yt.full{position:fixed;inset:0;z-index:80;background:#000}
 body.tv #yt.full #yt-scr{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}
 body.tv #yt.full #yt-ch{display:none}
 body.yt-full #reactor,body.yt-full #pods,body.yt-full #apps,body.yt-full #orbit,body.yt-full #motes,body.yt-full #embers,body.yt-full #top,body.yt-full .label{visibility:hidden}
-body.yt-full .spin,body.yt-full .orb,body.yt-full .glow,body.yt-full .halo,body.yt-full .pulse,body.yt-full .fg,body.yt-full .pt{animation-play-state:paused}
+/* a video in the tile or full screen: the room holds still (measured 10-29: FOX in the tile beside the moving HUB = 47 doubled
+   frames in 372 on the stick); the clock keeps its minutes */
+body.yt-on .spin,body.yt-on .orb,body.yt-on .glow,body.yt-on .halo,body.yt-on .pulse,body.yt-on .fg,body.yt-on .pt{animation-play-state:paused}
 .pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pod .glow{inset:-48%;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.08) 38%,transparent 64%);will-change:opacity;animation:breathe 4.6s ease-in-out infinite alternate}
 .pod .orb{inset:-15%;will-change:transform;animation:rot 28s linear infinite}
@@ -1341,6 +1346,7 @@ const YT = {
   },
   paint(hint) {
     const c = LOUNGE.TV.find(x => x.k === YT.k);
+    body.classList.toggle('yt-on', YT.playing());
     doc.querySelectorAll('#yt-ch .ch').forEach(b => b.classList.toggle('on', b.dataset.k === YT.k));
     $('yt-idle').hidden = YT.playing();
     $('yt-name').textContent = c ? c.short.toUpperCase() : 'YOUTUBE';

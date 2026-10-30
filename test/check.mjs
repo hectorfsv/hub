@@ -491,6 +491,7 @@ try {
     await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const src = await page.$eval('#yt-scr iframe', f => f.src).catch(() => '');
     ok(/^https:\/\/www\.youtube\.com\/embed\/.+autoplay=1.+origin=/.test(src) && !/mute=1/.test(src), 'Select plays the channel in the tile, with sound');
+    ok(await page.evaluate(() => document.body.classList.contains('yt-on') && getComputedStyle(document.querySelector('.r-ticks')).animationPlayState === 'paused'), 'while it plays, the room holds still');
     await page.keyboard.press('Enter');
     ok(await page.$eval('#yt', y => y.classList.contains('full')), 'Select again: full screen');
     await page.keyboard.press('ArrowRight'); await page.waitForTimeout(200);
@@ -498,7 +499,7 @@ try {
     await page.keyboard.press('Escape');
     ok(await page.$eval('#yt', y => !y.classList.contains('full')) && !!(await page.$('#yt-scr iframe')) && await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on')), 'Back: out of full screen, still playing, the ring on the playing channel');
     await page.keyboard.press('Escape');
-    ok(!(await page.$('#yt-scr iframe')), 'Back again: it stops');
+    ok(!(await page.$('#yt-scr iframe')) && await page.evaluate(() => !document.body.classList.contains('yt-on') && getComputedStyle(document.querySelector('.r-ticks')).animationPlayState === 'running'), 'Back again: it stops, the room moves again');
     // the news, in his order
     const first = await page.$eval('.nw small', e => e.textContent);
     ok(/^FOX (US|POLITICS)/.test(first), `the news starts with a US story (${first})`);
