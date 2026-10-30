@@ -34,8 +34,8 @@
   inside Hubs) and on his iPhone.
   Input is sacred: a press is sent on pointerdown, before any drawing, and the feedback is local and instant.
   At rest NOTHING moves: no animation loop, no infinite animation. A press plays short transform/opacity animations
-  only (the tablet's chip composites; anything else repaints). The only loop is the ambient view's slow glow, stopped
-  after 10 minutes. Tests: node test/remote-check.mjs (a mock of the stick: test/remote-mock.mjs).
+  only (the tablet's chip composites; anything else repaints). It is only ever the remote (Hector 10-30: "just be a
+  controller"): no other view after a while, 10 minutes untouched only lowers the tablet's backlight. Tests: node test/remote-check.mjs (a mock of the stick: test/remote-mock.mjs).
 -->
 <style>
 @font-face{font-family:'Bebas Neue';font-weight:400;font-display:block;src:url(fonts/bebas-neue-400.woff2) format('woff2')}
@@ -212,23 +212,6 @@ body.land #deck{left:auto;top:var(--deckT);width:var(--deckW);justify-content:ce
 .sq::after{border-radius:9px}
 .sq.go{color:#140C06;background:linear-gradient(180deg,#FFD27A,#E59A2E);box-shadow:0 0 0 1px #FFB547,0 0 14px rgba(255,181,71,.35)}
 
-/* ---- ambient: a minute untouched, the HUB's clock and what is on the TV; a calm glow, its only loop ---- */
-#amb{position:fixed;inset:0;z-index:20;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .3s ease;
-  background:radial-gradient(ellipse 80% 60% at 50% 44%,#1A1009 0%,#0C0806 55%,#050304 100%)}
-body.amb #amb{opacity:1;pointer-events:auto;transition:opacity 1.2s ease}
-.a-wrap{position:absolute;left:50%;top:44%;width:var(--D);height:var(--D);margin:calc(var(--D) / -2) 0 0 calc(var(--D) / -2)}
-.a-wrap>*{position:absolute}
-.a-halo{inset:-28%;border-radius:50%;opacity:.75;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.12) 32%,rgba(255,140,40,.04) 52%,transparent 70%)}
-.a-ring{inset:0;width:100%;height:100%}
-.a-core{inset:19%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 50% 36%,#2A1B10 0%,#170E09 50%,#0B0706 100%);box-shadow:0 0 0 1px rgba(255,181,71,.45),0 0 calc(var(--D)*.07) rgba(255,181,71,.2),inset 0 0 calc(var(--D)*.08) rgba(255,181,71,.15)}
-#a-time{font-family:var(--word);font-weight:400;font-size:calc(var(--D)*.25);line-height:.86;letter-spacing:.01em;white-space:nowrap;color:#FFE2A0;
-  text-shadow:0 0 calc(var(--D)*.035) rgba(255,181,71,.55),0 0 calc(var(--D)*.1) rgba(255,140,40,.25)}
-#a-date{margin-top:calc(var(--D)*.035);padding-left:.26em;font-family:var(--disp);font-weight:600;font-size:calc(var(--D)*.037);letter-spacing:.26em;color:var(--gold);opacity:.88;white-space:nowrap}
-.a-now{position:absolute;left:20px;right:20px;top:calc(44% + var(--D) / 2 + 28px);display:flex;align-items:center;justify-content:center;gap:12px}
-.a-now .nt b{font-size:30px}
-.a-hint{position:absolute;left:0;right:0;bottom:max(24px,env(safe-area-inset-bottom));text-align:center;font:500 10px var(--mono);letter-spacing:.3em;padding-left:.3em;color:var(--faint)}
-body.dimmed .a-wrap,body.dimmed .a-now{opacity:.55}
 
 /* ---- the key sheet, the toast (the HUB's) ---- */
 #sheet{position:fixed;left:0;right:0;top:0;z-index:30;padding:max(26px,env(safe-area-inset-top)) 24px 22px;background:rgba(14,9,7,.97);border-bottom:1px solid rgba(255,181,71,.4);box-shadow:0 18px 60px rgba(0,0,0,.8);touch-action:auto}
@@ -303,11 +286,6 @@ body.dimmed .a-wrap,body.dimmed .a-now{opacity:.55}
     <button type="button" class="k sq go" data-key="enter" data-ic="enter" aria-label="Enter"></button>
   </div></form>
 </section>
-<div id="amb" aria-hidden="true">
-  <div class="a-wrap"><div class="a-halo" id="a-halo"></div><svg class="a-ring" id="a-ring" viewBox="-100 -100 200 200"></svg><div class="a-core"><b id="a-time">--:--</b><span id="a-date"></span></div></div>
-  <div class="a-now"><div class="ic" id="a-ic"></div><div class="nt"><small>ON TV</small><b id="a-name">—</b></div></div>
-  <div class="a-hint">TOUCH TO WAKE</div>
-</div>
 <form id="sheet" hidden autocomplete="off">
   <h2>KEY NEEDED</h2>
   <p>The stick only answers its own remote. Open the remote from its link (the link carries the key), or paste the key here.</p>
@@ -326,8 +304,8 @@ const APP = window.HubsApp || null;            // the Hubs app when this page is
 const LANE = APP && typeof APP.press === 'function' && APP.keyState() !== 'none' ? APP : null;
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => { const v = Number(Q.get(k)); return v > 0 ? v : d; };
-// ?idle= and ?dim= (ms) shorten the ambient view and the dimming, for the tests and a quick look
-const CFG = { idle: num('idle', 60e3), dim: num('dim', 600e3), first: 350, minRep: 60, stale: 900, staleOp: 2500, timeout: 2000, connect: 4000, watchdog: 50e3, slop: 12 };
+// ?dim= (ms) shortens the dimming, for the tests and a quick look
+const CFG = { dim: num('dim', 600e3), first: 500, minRep: 60, stale: 900, staleOp: 2500, timeout: 2000, connect: 4000, watchdog: 50e3, slop: 12 };
 // the tablet reports "reduce motion" because Android's own animations are off for speed (10-28); inside an app the motion stays
 const INAPP = !!APP || /; wv\)/.test(navigator.userAgent);
 function openPit() {   // the Pit: the same native switch the HUB's own service grid uses, by name (not a fixed index)
@@ -352,8 +330,7 @@ const store = {
 };
 const AUTH = { k: window.__hubsKey || store.get(KEYNAME) || null };
 try { delete window.__hubsKey; } catch (e) { /* an old engine */ }
-const S = { geo: null, front: null, adb: 'ok', v: '', auth: AUTH.k ? null : 'key', ambient: false, dimmed: false, loop: null, tIdle: 0, tDim: 0,
-  swallow: new Set(), swallowClick: 0, sheet: false, yt: null, ytFull: false, adbRefused: false, now: '', tiltT: 0, tilt: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)' };
+const S = { geo: null, front: null, adb: 'ok', v: '', auth: AUTH.k ? null : 'key', dimmed: false, tDim: 0, sheet: false, yt: null, ytFull: false, adbRefused: false, now: '', tiltT: 0, tilt: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)' };
 const NET = { state: 'boot', q: [], busy: false, fails: 0, ctl: null, es: null, gen: 0, retryT: 0, dog: 0, live: false, probeAt: 0, sent: 0, dropped: 0 };
 const APPS = { list: [], at: 0, busy: false };
 const PTR = new Map();                          // every finger (or the mouse) on a control, by pointerId
@@ -440,20 +417,6 @@ function flareSvg(i) {
     + `<path d="${arc(85, -36, 36)}" fill="none" stroke="#FFF6DA" stroke-width="1.6" stroke-linecap="round"/>`
     + `<path d="${CHEV}" fill="none" stroke="#FFE9B0" stroke-opacity=".4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
     + `<path d="${CHEV}" fill="none" stroke="#FFFDF5" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-}
-// the ambient view's ring: the HUB's own reactor, drawn the HUB's way
-function drawAmbient() {
-  const c = 2 * Math.PI * 76, a = c * 84 / 360, g = c * 36 / 360;
-  let tri = '', notch = '';
-  for (const x of [0, 90, 180, 270]) tri += `M${P(93, x)}L${P(97.5, x - 2.4)}L${P(97.5, x + 2.4)}Z`;
-  for (const x of [45, 135, 225, 315]) notch += `M${P(93.5, x)}L${P(101, x)}`;
-  $('a-ring').innerHTML = '<defs><linearGradient id="a-sg" x1="0" y1="-1" x2="0" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#FFB547"/><stop offset="1" stop-color="#B8741A"/></linearGradient></defs>'
-    + '<circle r="99" fill="none" stroke="#FFB547" stroke-width=".5" opacity=".45"/><circle r="95.5" fill="none" stroke="#FFB547" stroke-width=".35" opacity=".22"/>'
-    + `<path d="${notch}" stroke="#FFD27A" stroke-width="1.2" opacity=".7"/>` + ticks(81.5, 84.5, 90) + `<path d="${tri}" fill="#FFB547" opacity=".85"/>`
-    + '<circle r="71" fill="none" stroke="#FFB547" stroke-width=".4" opacity=".4"/><circle r="81" fill="none" stroke="#FFB547" stroke-width=".4" opacity=".3"/>'
-    + `<circle r="76" fill="none" stroke="url(#a-sg)" stroke-width="5" stroke-dasharray="${a.toFixed(2)} ${g.toFixed(2)}" transform="rotate(-132)" opacity=".95"/>`
-    + `<circle r="76" fill="none" stroke="#FFF1CC" stroke-width=".8" stroke-dasharray="${(a * .18).toFixed(2)} ${(a * .82 + g).toFixed(2)}" transform="rotate(-132)" opacity=".9"/>`
-    + '<circle r="67" fill="none" stroke="#FFB547" stroke-width="1.1" stroke-dasharray=".9 3.1" opacity=".62"/>';
 }
 const FX = { fl: {}, wv: [], sp: [], wi: 0, si: 0, tick: 0, cf: null, dot: null };
 function buildFx() {
@@ -759,7 +722,6 @@ function renderNow() {
   if (sig === S.now) return;
   const first = !S.now; S.now = sig;
   $('now-name').textContent = n.name; paintIc($('now-ic'), n);
-  $('a-name').textContent = n.name; paintIc($('a-ic'), n);
   if (!first && MOTION) $('now').animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0px)' }], { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1)' });
 }
 async function loadApps(force) {
@@ -832,7 +794,7 @@ function arrow(d, n, how) {
 }
 function padPress(p) {
   arrow(p.d, 1, 'press');
-  p.t = setTimeout(function rep() {   // a hold repeats: 350 ms, then faster and faster
+  p.t = setTimeout(function rep() {   // a hold repeats: 500 ms (350 made a slow tap a double step, 10-30), then faster and faster
     if (!p.live) return;
     p.n++; arrow(p.d, 1, 'rep');
     p.t = setTimeout(rep, Math.max(CFG.minRep, Math.round(180 * Math.pow(.86, p.n - 1))));
@@ -967,57 +929,31 @@ doc.addEventListener('keydown', e => {
 });
 doc.addEventListener('keyup', e => { const d = KB[e.key]; if (d && e.target !== TI) { flareOff(d); settle(); } });
 
-// ---- idle: a minute untouched, the ambient view; ten minutes, the screen dims. The first touch only wakes it ----
+// ---- idle: ten minutes untouched, the app lowers the tablet's backlight; it stays the remote and every touch works ----
 function armIdle() {
-  clearTimeout(S.tIdle); clearTimeout(S.tDim);
+  clearTimeout(S.tDim);
   if (doc.hidden) return;
-  S.tIdle = setTimeout(ambient, CFG.idle);
   S.tDim = setTimeout(dim, CFG.dim);
 }
 const busy = () => PTR.size > 0 || S.sheet || doc.activeElement === TI || doc.hidden;
-function ambient() {
-  if (S.ambient) return;
-  if (busy()) { armIdle(); return; }
-  S.ambient = true; tick(); body.classList.add('amb');
-  if (MOTION) S.loop = $('a-halo').animate([{ opacity: .5, transform: 'scale(.96)' }, { opacity: 1, transform: 'scale(1.04)' }],
-    { duration: 6500, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
-}
 function dim() {
   if (busy()) { armIdle(); return; }
-  if (!S.ambient) ambient();
-  stopLoop();
   S.dimmed = true; body.classList.add('dimmed');
   if (APP && typeof APP.dim === 'function') try { APP.dim(true); } catch (e) { /* the app said no */ }
 }
-function stopLoop() { if (S.loop) { S.loop.cancel(); S.loop = null; } }
 function wake() {
-  const was = S.ambient || S.dimmed;
-  if (S.ambient) { S.ambient = false; body.classList.remove('amb'); }
-  stopLoop();
   if (S.dimmed) { S.dimmed = false; body.classList.remove('dimmed'); if (APP && typeof APP.dim === 'function') try { APP.dim(false); } catch (e) { /* same */ } }
   armIdle();
-  return was;
 }
-window.addEventListener('pointerdown', e => {
-  if (S.ambient || S.dimmed) { e.preventDefault(); e.stopImmediatePropagation(); S.swallow.add(e.pointerId); wake(); return; }
-  armIdle();
-}, true);
-for (const t of ['pointermove', 'pointerup', 'pointercancel']) window.addEventListener(t, e => {
-  if (!S.swallow.has(e.pointerId)) return;
-  e.stopImmediatePropagation();
-  if (t !== 'pointermove') { S.swallow.delete(e.pointerId); S.swallowClick = Date.now() + 350; }
-}, true);
-window.addEventListener('click', e => { if (Date.now() < S.swallowClick) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
-window.addEventListener('keydown', e => { if (S.ambient || S.dimmed) { e.preventDefault(); e.stopImmediatePropagation(); wake(); return; } armIdle(); }, true);
+window.addEventListener('pointerdown', wake, true);   // the touch itself goes on to its key as usual
+window.addEventListener('keydown', wake, true);
 doc.addEventListener('input', armIdle, true);
 
 // ---- the clock (24-hour, his tablet's) ----
-const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const hm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 function tick() {
   const d = new Date();
-  $('clock').textContent = $('a-time').textContent = hm(d);
-  $('a-date').textContent = `${DAYS[d.getDay()]} · ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  $('clock').textContent = hm(d);
   clearTimeout(tick.t); tick.t = setTimeout(tick, 60000 - d.getSeconds() * 1000 - d.getMilliseconds() + 30);
 }
 
@@ -1042,7 +978,7 @@ function toast(msg, ms) {
 
 // ---- in and out of view: nothing runs while hidden, and the stream lets go of its slot on the stick ----
 doc.addEventListener('visibilitychange', () => {
-  if (doc.hidden) { closeStream(); clearTimeout(NET.retryT); stopAll(); stopLoop(); clearTimeout(S.tIdle); clearTimeout(S.tDim); return; }
+  if (doc.hidden) { closeStream(); clearTimeout(NET.retryT); stopAll(); clearTimeout(S.tDim); return; }
   NET.fails = 0; tick(); wake(); connect(); loadApps();
 });
 window.addEventListener('pagehide', closeStream);
@@ -1054,12 +990,12 @@ window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layo
 
 // ---- a handle for the tests (and a look from the Mac): reads only ----
 window.remote = {
-  state: () => JSON.parse(JSON.stringify({ net: NET.state, live: NET.live, adb: S.adb, auth: S.auth, front: S.front, v: S.v, ambient: S.ambient, dimmed: S.dimmed,
+  state: () => JSON.parse(JSON.stringify({ net: NET.state, live: NET.live, adb: S.adb, auth: S.auth, front: S.front, v: S.v, dimmed: S.dimmed,
     apps: APPS.list.length, queue: NET.q.length, sent: NET.sent, dropped: NET.dropped, geo: S.geo, step: step(), pointers: PTR.size, motion: MOTION, streams: STREAMS, yt: S.yt, ytFull: S.ytFull })),
   cfg: CFG,
 };
 
-drawReactor(); drawAmbient(); buildFx(); fillIcons(); buildYT();
+drawReactor(); buildFx(); fillIcons(); buildYT();
 doc.querySelectorAll('[data-key]').forEach(bindKey);
 layout(true); tick(); renderStatus(); renderNow(); paintYT();
 if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(() => layout(true));

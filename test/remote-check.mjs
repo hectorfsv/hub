@@ -2,7 +2,7 @@
 // (Safari's engine, 18.4, his iPhone) and, when its cached copy is on this Mac, headless Chromium (the tablet's WebView is
 // Chromium; --webkit skips it). Sizes: the tablet upright (533x853 at 1.5x, touch: the main one), sideways, his iPhone
 // (440x956 at 3x). One browser at a time, each closed in a finally; a hard timeout ends the run. Nothing real is called.
-// Screenshots: test/shots/remote-<size>.png (WebKit), remote-<size>-chromium.png, remote-ambient-tablet.png (not committed).
+// Screenshots: test/shots/remote-<size>.png (WebKit), remote-<size>-chromium.png (not committed).
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -208,7 +208,7 @@ async function tabletFull() {
     await sleep(700);
     const gaps = times.slice(1).map((t, i) => t - times[i]);
     ok(held >= 6 && held <= 14, `hold up 1.3 s: ${held} presses`);
-    ok(gaps.length > 3 && gaps[0] >= 280 && gaps[0] <= 450 && gaps[gaps.length - 1] < gaps[1], `the first repeat after ~350 ms (${gaps[0]}), then faster (last gap ${gaps[gaps.length - 1]} ms)`);
+    ok(gaps.length > 3 && gaps[0] >= 430 && gaps[0] <= 600 && gaps[gaps.length - 1] < gaps[1], `the first repeat after ~500 ms, so a slow tap is one step (${gaps[0]}), then faster (last gap ${gaps[gaps.length - 1]} ms)`);
     ok(sumKey('up', from) === held, 'released: the repeat stops');
     from = mock.calls.length;
     await finger(page, 'pointerdown', 7, ...segPt(g, 'right'));
@@ -410,33 +410,25 @@ async function tabletFull() {
     ok(await linked(page), 'reopened without ?k=: the kept key links it');
   } finally { await ctx.close(); }
 
-  // idle: the ambient view after a while, the bridge dims after longer, the first touch only wakes
-  console.log(`\n${name}: idle (?idle=1500&dim=4500, standing in for 60 s and 10 min)`);
+  // idle: it stays the remote (Hector 10-30: "just be a controller"); 10 minutes untouched only dims the backlight, and every touch works
+  console.log(`\n${name}: idle (?dim=3000, standing in for 10 min)`);
   mock.reset();
   {
-    const { ctx, page, errors } = await open('tablet', { query: 'k=' + TOKEN + '&idle=1500&dim=4500', app: true });
+    const { ctx, page, errors } = await open('tablet', { query: 'k=' + TOKEN + '&dim=3000', app: true });
     try {
       ok(await linked(page), 'linked');
-      ok(await until(page, () => document.body.classList.contains('amb'), 4000), 'a while untouched: the ambient view');
-      await sleep(1400);
-      const amb = await page.evaluate(() => ({ time: document.getElementById('a-time').textContent, name: document.getElementById('a-name').textContent, op: getComputedStyle(document.getElementById('amb')).opacity }));
-      ok(/^\d\d:\d\d$/.test(amb.time) && amb.name === 'NETFLIX' && +amb.op > .99, `it shows the HUB's clock (${amb.time}) and what is on the TV (${amb.name})`);
-      const m1 = await moving(page);
-      ok(m1.length === 1 && m1[0].who === 'a-halo' && m1[0].props.every(p => p === 'transform' || p === 'opacity'), `one slow loop, the glow, transform and opacity only (${JSON.stringify(m1)})`);
-      await shot(page, engineName === 'webkit' ? 'remote-ambient-tablet' : 'remote-ambient-tablet-chromium');
-      mock.setFront({ pkg: 'com.plexapp.android', name: 'Plex' });
-      ok(await until(page, () => document.getElementById('a-name').textContent === 'PLEX', 1500), 'the ambient view follows the TV too');
-      ok(await until(page, () => window.__dim.includes(true), 5000), 'longer untouched: HubsApp.dim(true)');
+      ok(await until(page, () => window.__dim.includes(true), 5000), 'untouched: HubsApp.dim(true)');
+      ok(!(await page.$('#amb')) && await page.isVisible('#reactor'), 'no other view: the remote is still on screen');
       await sleep(100);
-      ok((await moving(page)).length === 0, 'dimmed: the loop stops, nothing moves');
+      ok((await moving(page)).length === 0, 'dimmed: nothing moves');
       const g = (await st(page)).geo, from = mock.calls.length;
       await page.touchscreen.tap(...segPt(g, 'up'));
-      await sleep(500);
-      ok(anyKeyRequest(from).length === 0, 'the first touch only wakes it: no key');
-      const w = await page.evaluate(() => ({ amb: document.body.classList.contains('amb'), dim: window.__dim.slice() }));
-      ok(!w.amb && w.dim[w.dim.length - 1] === false, 'woken: the remote is back and HubsApp.dim(false)');
-      await page.touchscreen.tap(...segPt(g, 'up'));
-      ok(await mock.waitFor(() => sumKey('up', from) === 1, 1500), 'the next touch presses');
+      ok(await mock.waitFor(() => sumKey('up', from) === 1, 1500), 'dimmed, a touch on Up presses Up at once');
+      ok(await page.evaluate(() => window.__dim[window.__dim.length - 1] === false), 'and brings the backlight back: HubsApp.dim(false)');
+      ok(await until(page, () => window.__dim.filter(x => x).length >= 2, 5000), 'untouched again: dimmed again');
+      const o = await page.locator('#apps-rail .orb').first().boundingBox(), from2 = mock.calls.length;
+      await page.touchscreen.tap(o.x + o.width / 2, o.y + o.height / 2);
+      ok(await mock.waitFor(() => mock.calls.slice(from2).some(c => c.path === '/api/launch'), 1500), 'dimmed, a touch on an app opens it: every key works');
       await page.keyboard.press('ArrowLeft');
       ok(await mock.waitFor(() => sumKey('left', from) === 1, 1500), 'a keyboard works it too (ArrowLeft)');
       ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
