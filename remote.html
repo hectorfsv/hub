@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<script>
+/* The key arrives once as ?k=. It is kept on this device and taken out of the address bar before anything else loads. */
+(function () {
+  try {
+    var u = new URL(location.href), k = u.searchParams.get('k');
+    if (k === null) return;
+    u.searchParams.delete('k');
+    history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    if (/^[A-Za-z0-9_-]{8,128}$/.test(k)) {
+      window.__hubsKey = k;
+      try { localStorage.setItem('hubs.remote.k', k); } catch (e) { /* a private window: this visit only */ }
+    }
+  } catch (e) { /* no URL API: nothing to take out */ }
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0A0708">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Remote">
+<title>REMOTE</title>
+<link rel="icon" href="data:,">
+<!--
+  The remote: the HUB's reactor as the Fire TV Stick's d-pad (Hector 2026-10-29: "make it a remote control for the HUB ...
+  super BADASS"). Served by the stick itself (Hubs' :watch process, port 8790; the contract is
+  research/fire-stick-remote-spec-20261029.md), so every call is same-origin. Runs on the desk tablet (533x853 at 1.5x,
+  inside Hubs) and on his iPhone.
+  Input is sacred: a press is sent on pointerdown, before any drawing, and the feedback is local and instant.
+  At rest NOTHING moves: no animation loop, no infinite animation. A press plays short transform/opacity animations
+  only (the tablet's chip composites; anything else repaints). The only loop is the ambient view's slow glow, stopped
+  after 10 minutes. Tests: node test/remote-check.mjs (a mock of the stick: test/remote-mock.mjs).
+-->
+<style>
+@font-face{font-family:'Bebas Neue';font-weight:400;font-display:block;src:url(fonts/bebas-neue-400.woff2) format('woff2')}
+@font-face{font-family:'Chakra Petch';font-weight:500;font-display:block;src:url(fonts/chakra-petch-500.woff2) format('woff2')}
+@font-face{font-family:'Chakra Petch';font-weight:600;font-display:block;src:url(fonts/chakra-petch-600.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-weight:500;font-display:block;src:url(fonts/ibm-plex-mono-500.woff2) format('woff2')}
+:root{
+  --void:#0A0708;--gold:#FFB547;--gold-hot:#FFE9B0;--gold-deep:#B8741A;--ink:#F2EAE8;--dim:#9A8C8A;--faint:#5E5250;
+  --ember:#FF6A1A;--ember-hot:#FFC46B;--red:#FF3B30;--go:#3FD07A;
+  --word:'Bebas Neue','Arial Narrow',Impact,sans-serif;--disp:'Chakra Petch','Trebuchet MS',sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --R:170px;--bgX:50%;--bgY:38%;--D:420px;--deckW:360px;--deckT:70px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--void);color:var(--ink);overflow:hidden}
+body{position:fixed;inset:0;font-family:var(--disp);-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent}
+button:focus{outline:none}
+button:focus-visible{outline:2px solid var(--gold-hot);outline-offset:3px}
+svg{overflow:visible}
+[hidden]{display:none!important}
+.icn{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.icn .f{fill:currentColor;fill-opacity:.2}
+
+/* ---- the room, the HUB's: painted once ---- */
+#bg{position:absolute;inset:0;background:radial-gradient(ellipse 85% 60% at var(--bgX) var(--bgY),#21150D 0%,#140C08 38%,var(--void) 72%)}
+#grid{position:absolute;inset:0;background-image:radial-gradient(rgba(255,181,71,.17) .9px,transparent 1.5px);background-size:22px 22px;
+  -webkit-mask-image:radial-gradient(ellipse 80% 62% at var(--bgX) var(--bgY),#000 0%,rgba(0,0,0,.4) 50%,transparent 82%);mask-image:radial-gradient(ellipse 80% 62% at var(--bgX) var(--bgY),#000 0%,rgba(0,0,0,.4) 50%,transparent 82%)}
+#corners{position:absolute;left:10px;right:10px;top:10px;height:22px;pointer-events:none;z-index:6}
+#corners i{position:absolute;width:22px;height:22px;border:solid rgba(255,181,71,.38);border-width:0}
+#corners i:nth-child(1){left:0;top:0;border-left-width:1.5px;border-top-width:1.5px}
+#corners i:nth-child(2){right:0;top:0;border-right-width:1.5px;border-top-width:1.5px}
+#corners i:nth-child(3){left:0;bottom:0;border-left-width:1.5px;border-bottom-width:1.5px}
+#corners i:nth-child(4){right:0;bottom:0;border-right-width:1.5px;border-bottom-width:1.5px}
+#corners i:nth-child(n+3){display:none}   /* the bottom belongs to the keys */
+
+/* ---- top: what is on the TV, the time, the link ---- */
+#top{position:absolute;z-index:2;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:max(18px,env(safe-area-inset-top)) max(26px,env(safe-area-inset-right)) 6px max(26px,env(safe-area-inset-left))}
+#now{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+.ic{flex:none;position:relative;width:42px;height:42px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--gold-hot);
+  background:radial-gradient(circle at 50% 30%,#2B1D12 0%,#150E0A 60%,#0A0708 100%);box-shadow:0 0 0 1.5px rgba(255,181,71,.6),0 0 14px rgba(255,181,71,.24)}
+.ic img{display:block;width:100%;height:100%;object-fit:cover}
+.ic svg{width:60%;height:60%}
+#pit-btn{flex:none;transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
+#pit-btn:active{transform:scale(.88)}
+.nt{min-width:0}
+.nt small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;color:var(--dim);white-space:nowrap}
+.nt b{display:block;margin:-1px -14px -4px;padding:4px 14px;font-family:var(--word);font-weight:400;font-size:27px;line-height:1;letter-spacing:.08em;color:var(--gold-hot);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 14px rgba(255,181,71,.32)}
+#right{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#clock{font-family:var(--word);font-weight:400;font-size:27px;line-height:1;letter-spacing:.05em;color:#FFE2A0;text-shadow:0 0 12px rgba(255,181,71,.35)}
+#link{display:flex;align-items:center;height:28px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--dim);white-space:nowrap}   /* the chip's height: the top bar never changes size */
+#link em{font-style:normal}
+#link i{display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;vertical-align:1px;background:var(--faint)}
+#link.on i{background:var(--go);box-shadow:0 0 6px var(--go)}
+#chip{position:relative;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border-radius:6px;font:500 10px var(--mono);letter-spacing:.15em;white-space:nowrap;
+  color:var(--gold);background:rgba(255,181,71,.08);box-shadow:inset 0 0 0 1px rgba(255,181,71,.55)}
+#chip::before{content:'';flex:none;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+#chip::after{content:'';position:absolute;inset:-10px -4px}
+#chip.bad{color:#FF8A80;background:rgba(255,59,48,.1);box-shadow:inset 0 0 0 1px rgba(255,59,48,.6)}
+#chip.ask{color:#140C06;background:var(--gold-hot);box-shadow:0 0 16px rgba(255,181,71,.5)}
+#chip.ask::before{background:#140C06;box-shadow:none}
+#chip.wait{color:var(--dim);box-shadow:inset 0 0 0 1px rgba(255,181,71,.3)}
+#banner{position:absolute;z-index:7;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));top:calc(var(--deckT) + 4px);padding:12px 16px 13px;border-radius:10px;text-align:center;pointer-events:none;
+  background:rgba(22,14,9,.97);box-shadow:inset 0 0 0 1px rgba(255,233,176,.7),0 12px 40px rgba(0,0,0,.7),0 0 30px rgba(255,181,71,.25)}
+#banner b{display:block;font-family:var(--word);font-weight:400;font-size:27px;line-height:1.05;letter-spacing:.12em;color:var(--gold-hot)}
+#banner span{display:block;margin-top:5px;font-size:13.5px;line-height:1.4;color:var(--ink)}
+#banner em{font-style:normal;font-weight:600;color:var(--gold-hot)}
+
+/* ---- the stage: the reactor (the d-pad), its pods on the orbit, the keys at its sides ---- */
+#stage,#deck{transition:opacity .4s ease}
+body.off #stage,body.off #deck{opacity:.42}
+#stage{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+#stage>*{position:absolute;pointer-events:auto}
+#stage>#orbit,#stage>.plabel{pointer-events:none}
+#reactor{border-radius:50%;touch-action:none}
+#tilt{position:absolute;inset:0;pointer-events:none;will-change:transform;transform:perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)}
+#tilt>*{position:absolute;pointer-events:none}
+/* the glow behind the reactor: still, outside the tilting layer, so the layer stays the reactor's own size */
+#halo{pointer-events:none!important;border-radius:50%;background:radial-gradient(circle,rgba(255,181,71,.27) 0%,rgba(255,181,71,.11) 30%,rgba(255,140,40,.04) 50%,transparent 68%)}
+#r-static,#r-seg{inset:0;width:100%;height:100%}
+#r-ticks{inset:0;will-change:transform}
+#r-ticks svg,.fl svg{position:absolute;inset:0;width:100%;height:100%}
+.fl{inset:0;opacity:0;will-change:opacity}
+.core{inset:31.5%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 34%,#2C1C10 0%,#180F09 52%,#0B0706 100%);
+  box-shadow:0 0 0 1px rgba(255,181,71,.5),0 0 calc(var(--R)*.12) rgba(255,181,71,.2),inset 0 0 calc(var(--R)*.12) rgba(255,181,71,.16)}
+.core b{font-family:var(--word);font-weight:400;font-size:calc(var(--R)*.3);line-height:.86;letter-spacing:.06em;padding-left:.06em;color:#FFE2A0;
+  text-shadow:0 0 calc(var(--R)*.06) rgba(255,181,71,.6),0 0 calc(var(--R)*.16) rgba(255,140,40,.28)}
+.core span{margin-top:calc(var(--R)*.035);font-family:var(--mono);font-size:max(8px,calc(var(--R)*.046));letter-spacing:.22em;padding-left:.22em;color:var(--dim);white-space:nowrap}
+.cflash{inset:31.5%;border-radius:50%;opacity:0;will-change:opacity;background:radial-gradient(circle,rgba(255,246,218,.75) 0%,rgba(255,181,71,.34) 42%,rgba(255,140,40,0) 72%)}
+.wave{inset:31.5%;border-radius:50%;opacity:0;box-shadow:0 0 0 1.6px rgba(255,233,176,.95),0 0 18px 3px rgba(255,181,71,.5),inset 0 0 14px rgba(255,181,71,.4)}
+.sp{left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;opacity:0;background:radial-gradient(circle,#FFFDF5 0%,#FFE0A0 16%,#FFC46B 28%,rgba(255,106,26,.85) 48%,rgba(255,80,20,0) 72%)}
+.dot{left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;border-radius:50%;opacity:0;will-change:transform,opacity;
+  background:radial-gradient(circle,rgba(255,246,218,.75) 0%,rgba(255,181,71,.3) 36%,rgba(255,181,71,0) 70%)}
+#orbit{overflow:visible}
+.pod{border-radius:50%;touch-action:none;transition:transform .22s cubic-bezier(.3,1.6,.5,1)}
+.pod>span{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.pod .orbr{inset:-15%;border:1px dashed rgba(255,181,71,.34)}
+.pod .glw{inset:-42%;opacity:0;background:radial-gradient(circle,rgba(255,200,110,.5) 0%,rgba(255,181,71,.16) 40%,transparent 66%);transition:opacity .3s ease}
+.pod .ring{box-shadow:0 0 0 1.6px rgba(255,190,90,.9),0 0 18px rgba(255,181,71,.38),inset 0 0 16px rgba(255,181,71,.26)}
+.pod .face{inset:5px;overflow:hidden;background:radial-gradient(circle at 50% 30%,#2B1D12 0%,#150E0A 55%,#0A0708 100%)}
+.pod .face::after{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(180deg,rgba(255,233,176,.12),transparent 42%)}
+.pod .icon{inset:27%;display:flex;color:var(--gold-hot)}
+.pod .icon svg{width:100%;height:100%}
+.pod.down{transform:scale(.9);transition-duration:.06s}
+.pod.down .glw{opacity:1;transition-duration:.05s}
+.plabel{z-index:3;width:120px;margin-left:-60px;text-align:center;font-family:var(--word);font-weight:400;font-size:17px;line-height:1;letter-spacing:.16em;padding-left:.16em;color:var(--ink)}
+
+/* ---- keys: one capsule per group; a press sinks the key and lights it from inside ---- */
+.cap{display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(180deg,#1F150E 0%,#110A07 100%);
+  box-shadow:0 0 0 1px rgba(255,181,71,.36),inset 0 1px 0 rgba(255,233,176,.1),0 8px 24px rgba(0,0,0,.5)}
+.cap>i{position:relative;display:block;flex:none;height:1px;margin:0 10px;background:rgba(255,181,71,.22)}
+.cap>i b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0 5px;background:#170F0A;font:500 8.5px var(--mono);letter-spacing:.2em;padding-left:calc(5px + .2em);color:var(--dim)}
+.cap.bar{flex-direction:row}
+.cap.bar>i{width:1px;height:auto;margin:11px 0}
+.side{display:flex;flex-direction:column;gap:12px}
+.k{position:relative;flex:1;min-width:48px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--gold-hot);border-radius:16px;touch-action:none;
+  transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.k::after{content:'';position:absolute;inset:3px;border-radius:13px;opacity:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,rgba(255,214,140,.45) 0%,rgba(255,181,71,.15) 55%,transparent 80%);transition:opacity .28s ease}
+.k svg{flex:none;width:26px;height:26px}
+.k small{font:500 8.5px var(--mono);letter-spacing:.2em;padding-left:.2em;color:var(--dim)}
+.k.down{transform:scale(.92);transition-duration:.05s}
+.k.down::after{opacity:1;transition-duration:.04s}
+.side .k{min-height:58px}
+#sides:empty{display:none}
+#sides{gap:10px;align-items:stretch}
+#sides .side{flex-direction:row;gap:10px}
+#sides #side-l{flex:1.15}
+#sides #side-r{flex:1}
+#sides .cap{flex:1;flex-direction:row;height:58px}
+#sides .cap>i{width:1px;height:auto;margin:11px 0}
+#sides #side-r .cap{flex-direction:row-reverse}
+#sides .k{min-height:58px;flex:1}
+#sides .k.solo{flex:.8}
+.k.solo{background:linear-gradient(180deg,#1F150E 0%,#110A07 100%);box-shadow:0 0 0 1px rgba(255,181,71,.36),inset 0 1px 0 rgba(255,233,176,.1),0 8px 24px rgba(0,0,0,.5)}
+
+/* ---- the deck: media, the apps, YouTube on the HUB, typing ---- */
+#deck{position:absolute;z-index:4;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:11px}
+body.land #deck{left:auto;top:var(--deckT);width:var(--deckW);justify-content:center;gap:16px}
+#media{height:58px;flex:none}
+#media .k{flex:1}
+#media .mid{flex:1.35}
+#media .mid svg{width:30px;height:30px}
+.blk{display:flex;flex-direction:column;gap:5px;min-width:0}
+.hd{padding-left:3px;font:500 8.5px var(--mono);letter-spacing:.24em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd em{font-style:normal;color:var(--faint)}
+.row{display:flex;align-items:center;gap:8px;min-width:0}
+.rail{display:flex;gap:8px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.rail::-webkit-scrollbar{display:none}
+#apps-rail{gap:6px;padding:4px 3px 2px;min-height:76px}
+.orb{flex:none;width:64px;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:pan-x;transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.orb i{position:relative;display:block;flex:none;width:52px;height:52px;border-radius:50%;overflow:hidden;background:#100A07;box-shadow:0 0 0 1.5px rgba(255,181,71,.42),0 0 12px rgba(255,181,71,.14)}
+.orb img{display:block;width:100%;height:100%;object-fit:cover;filter:saturate(.5) brightness(.78)}
+.orb b{max-width:64px;font:500 8.5px var(--mono);letter-spacing:.1em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orb.live i{box-shadow:0 0 0 2.5px var(--gold-hot),0 0 20px rgba(255,181,71,.6)}
+.orb.live img{filter:none}
+.orb.live b{color:var(--gold-hot)}
+.orb.down{transform:scale(.9);transition-duration:.06s}
+#apps-rail .none{align-self:center;padding-left:4px;font:500 10px var(--mono);letter-spacing:.18em;color:var(--faint);white-space:nowrap}
+.ch{flex:none;height:48px;padding:0 13px;border-radius:9px;box-shadow:inset 0 0 0 1px rgba(255,181,71,.3);font:500 11px var(--mono);letter-spacing:.14em;color:var(--dim);white-space:nowrap;touch-action:pan-x;
+  transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.ch.on{color:var(--gold-hot);box-shadow:inset 0 0 0 1.5px var(--gold),0 0 14px rgba(255,181,71,.22)}
+.ch.on::before{content:'■ '}
+.ch.down{transform:scale(.94);transition-duration:.06s}
+.ch.ctl{width:48px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--gold-hot);touch-action:none}
+.ch.ctl svg{width:22px;height:22px}
+.ch.ctl.on::before{content:none}
+#type-in{flex:1;min-width:0;height:48px;padding:0 14px;border-radius:12px;border:0;outline:0;background:#140D0A;color:var(--ink);font:500 16px var(--disp);letter-spacing:.04em;caret-color:var(--gold);
+  box-shadow:inset 0 0 0 1px rgba(255,181,71,.35);user-select:text;-webkit-user-select:text;touch-action:manipulation;-webkit-appearance:none;appearance:none}
+#type-in:focus{box-shadow:inset 0 0 0 1.5px var(--gold),0 0 16px rgba(255,181,71,.2)}
+#type-in::placeholder{color:var(--faint);font:500 10.5px var(--mono);letter-spacing:.2em}
+.sq{flex:none;width:48px;height:48px;min-height:48px;border-radius:12px;background:linear-gradient(180deg,#1F150E,#110A07);box-shadow:0 0 0 1px rgba(255,181,71,.36),inset 0 1px 0 rgba(255,233,176,.1)}
+.sq svg{width:24px;height:24px}
+.sq::after{border-radius:9px}
+.sq.go{color:#140C06;background:linear-gradient(180deg,#FFD27A,#E59A2E);box-shadow:0 0 0 1px #FFB547,0 0 14px rgba(255,181,71,.35)}
+
+/* ---- ambient: a minute untouched, the HUB's clock and what is on the TV; a calm glow, its only loop ---- */
+#amb{position:fixed;inset:0;z-index:20;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .3s ease;
+  background:radial-gradient(ellipse 80% 60% at 50% 44%,#1A1009 0%,#0C0806 55%,#050304 100%)}
+body.amb #amb{opacity:1;pointer-events:auto;transition:opacity 1.2s ease}
+.a-wrap{position:absolute;left:50%;top:44%;width:var(--D);height:var(--D);margin:calc(var(--D) / -2) 0 0 calc(var(--D) / -2)}
+.a-wrap>*{position:absolute}
+.a-halo{inset:-28%;border-radius:50%;opacity:.75;background:radial-gradient(circle,rgba(255,181,71,.3) 0%,rgba(255,181,71,.12) 32%,rgba(255,140,40,.04) 52%,transparent 70%)}
+.a-ring{inset:0;width:100%;height:100%}
+.a-core{inset:19%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 36%,#2A1B10 0%,#170E09 50%,#0B0706 100%);box-shadow:0 0 0 1px rgba(255,181,71,.45),0 0 calc(var(--D)*.07) rgba(255,181,71,.2),inset 0 0 calc(var(--D)*.08) rgba(255,181,71,.15)}
+#a-time{font-family:var(--word);font-weight:400;font-size:calc(var(--D)*.25);line-height:.86;letter-spacing:.01em;white-space:nowrap;color:#FFE2A0;
+  text-shadow:0 0 calc(var(--D)*.035) rgba(255,181,71,.55),0 0 calc(var(--D)*.1) rgba(255,140,40,.25)}
+#a-date{margin-top:calc(var(--D)*.035);padding-left:.26em;font-family:var(--disp);font-weight:600;font-size:calc(var(--D)*.037);letter-spacing:.26em;color:var(--gold);opacity:.88;white-space:nowrap}
+.a-now{position:absolute;left:20px;right:20px;top:calc(44% + var(--D) / 2 + 28px);display:flex;align-items:center;justify-content:center;gap:12px}
+.a-now .nt b{font-size:30px}
+.a-hint{position:absolute;left:0;right:0;bottom:max(24px,env(safe-area-inset-bottom));text-align:center;font:500 10px var(--mono);letter-spacing:.3em;padding-left:.3em;color:var(--faint)}
+body.dimmed .a-wrap,body.dimmed .a-now{opacity:.55}
+
+/* ---- the key sheet, the toast (the HUB's) ---- */
+#sheet{position:fixed;left:0;right:0;top:0;z-index:30;padding:max(26px,env(safe-area-inset-top)) 24px 22px;background:rgba(14,9,7,.97);border-bottom:1px solid rgba(255,181,71,.4);box-shadow:0 18px 60px rgba(0,0,0,.8);touch-action:auto}
+#sheet h2{font-family:var(--word);font-weight:400;font-size:28px;letter-spacing:.12em;color:var(--gold-hot)}
+#sheet p{font-size:14px;line-height:1.5;color:var(--dim);margin-top:8px}
+#sheet input{display:block;width:100%;height:52px;margin-top:12px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,181,71,.35);background:#140D0A;color:var(--ink);font:500 16px var(--mono);user-select:text;-webkit-user-select:text}
+#sheet input:focus{outline:none;border-color:var(--gold)}
+#sheet .row2{display:flex;gap:10px;margin-top:14px}
+#sheet button{flex:1;height:52px;border-radius:8px;border:1px solid rgba(255,181,71,.5);background:#1C130D;color:var(--ink);font:600 15px var(--disp);letter-spacing:.16em}
+#sheet button.go{background:var(--gold);border-color:var(--gold);color:#140C06}
+#sheet .err{color:#FF8A80;min-height:20px}
+#toast{position:fixed;left:50%;top:calc(var(--deckT) + 10px);z-index:40;transform:translate(-50%,-14px);opacity:0;padding:11px 18px;border-radius:6px;background:rgba(20,13,9,.96);border:1px solid rgba(255,181,71,.5);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--gold-hot);white-space:nowrap;transition:transform .3s cubic-bezier(.2,.9,.3,1),opacity .25s;pointer-events:none}
+#toast.on{transform:translate(-50%,0);opacity:1}
+#sa{position:fixed;left:0;bottom:0;width:1px;height:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="bg"></div><div id="grid"></div>
+<div id="corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<header id="top">
+  <div id="now"><button type="button" id="pit-btn" class="ic" data-ic="pit" aria-label="Open the Pit"></button><div class="ic" id="now-ic"></div><div class="nt"><small>NOW ON TV</small><b id="now-name">LINKING…</b></div></div>
+  <div id="right"><b id="clock">--:--</b><span id="link"><i></i><em id="link-t">LINKING</em></span><button type="button" id="chip" hidden></button></div>
+</header>
+<div id="banner" role="alert" hidden><b>PRESS OK ON THE TV ONCE</b><span>The TV asks to allow this remote: choose <em>Always allow</em>, then <em>OK</em>.</span></div>
+<main id="stage">
+  <svg id="orbit" aria-hidden="true"><defs><linearGradient id="og" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB547" stop-opacity="0"/><stop offset=".45" stop-color="#FFB547" stop-opacity="0"/><stop offset="1" stop-color="#FFB547" stop-opacity=".6"/></linearGradient></defs><circle id="orbit-c" fill="none" stroke="url(#og)" stroke-width="1.2" stroke-dasharray="2 7"/></svg>
+  <div class="halo" id="halo" aria-hidden="true"></div>
+  <button type="button" class="pod" data-key="back" data-ic="back" aria-label="Back"></button>
+  <button type="button" class="pod" data-key="home" data-ic="hub" aria-label="The HUB"></button>
+  <button type="button" class="pod" data-key="menu" data-ic="menu" aria-label="Menu"></button>
+  <div class="plabel" id="pl0">BACK</div><div class="plabel" id="pl1">HUB</div><div class="plabel" id="pl2">MENU</div>
+  <div class="side" id="side-l">
+    <div class="cap">
+      <button type="button" class="k" data-key="wake" data-ic="power" aria-label="TV on"><small>ON</small></button><i></i>
+      <button type="button" class="k" data-key="sleep" data-ic="moon" aria-label="TV off (sleep)"><small>OFF</small></button>
+    </div>
+    <button type="button" class="k solo" data-key="mute" data-ic="mute" aria-label="Mute"><small>MUTE</small></button>
+  </div>
+  <div class="side" id="side-r">
+    <div class="cap">
+      <button type="button" class="k" data-key="volup" data-rep data-ic="volup" aria-label="Volume up"></button><i><b>VOL</b></i>
+      <button type="button" class="k" data-key="voldown" data-rep data-ic="voldn" aria-label="Volume down"></button>
+    </div>
+  </div>
+  <!-- last in the stage: nothing paints over the reactor's layer, so nothing else needs a layer of its own -->
+  <div id="reactor" role="group" aria-label="Arrows and OK; swipe from the middle to move like a trackpad">
+    <div id="tilt">
+      <svg id="r-static" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+      <svg id="r-seg" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+      <div class="core" id="core"><b>OK</b><span>TAP · SWIPE</span></div>
+      <div id="r-ticks"><svg viewBox="-100 -100 200 200" aria-hidden="true"></svg></div>
+      <div class="cflash" id="cflash"></div>
+      <i class="dot" id="dot"></i>
+    </div>
+  </div>
+</main>
+<section id="deck">
+  <div class="row" id="sides"></div>
+  <div class="cap bar" id="media">
+    <button type="button" class="k" data-key="rewind" data-rep data-ic="rew" aria-label="Rewind"></button><i></i>
+    <button type="button" class="k mid" data-key="playpause" data-ic="play" aria-label="Play or pause"></button><i></i>
+    <button type="button" class="k" data-key="forward" data-rep data-ic="fwd" aria-label="Fast forward"></button>
+  </div>
+  <div class="blk" id="apps"><div class="hd">APPS <em>· OPEN ON THE TV</em></div><div class="rail" id="apps-rail"></div></div>
+  <div class="blk" id="yt"><div class="hd">YOUTUBE <em>· PLAYS ON THE HUB</em></div><div class="row"><div class="rail" id="yt-rail"></div>
+    <button type="button" class="ch ctl" id="yt-stop" data-ic="stop" aria-label="Stop the video"></button><button type="button" class="ch ctl" id="yt-full" data-ic="full" aria-label="Full screen"></button></div></div>
+  <form class="blk" id="type" autocomplete="off"><div class="hd">TYPE <em>· LIVE ON THE TV</em></div><div class="row">
+    <button type="button" class="k sq" data-key="search" data-ic="search" aria-label="Search"></button>
+    <input id="type-in" type="text" inputmode="text" enterkeyhint="send" placeholder="TYPE ON THE TV" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Type on the TV">
+    <button type="button" class="k sq" data-key="del" data-rep data-ic="del" aria-label="Delete"></button>
+    <button type="button" class="k sq go" data-key="enter" data-ic="enter" aria-label="Enter"></button>
+  </div></form>
+</section>
+<div id="amb" aria-hidden="true">
+  <div class="a-wrap"><div class="a-halo" id="a-halo"></div><svg class="a-ring" id="a-ring" viewBox="-100 -100 200 200"></svg><div class="a-core"><b id="a-time">--:--</b><span id="a-date"></span></div></div>
+  <div class="a-now"><div class="ic" id="a-ic"></div><div class="nt"><small>ON TV</small><b id="a-name">—</b></div></div>
+  <div class="a-hint">TOUCH TO WAKE</div>
+</div>
+<form id="sheet" hidden autocomplete="off">
+  <h2>KEY NEEDED</h2>
+  <p>The stick only answers its own remote. Open the remote from its link (the link carries the key), or paste the key here.</p>
+  <input id="sh-k" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="the key: 32 letters and digits" aria-label="The key">
+  <p class="err" id="sh-err"></p>
+  <div class="row2"><button type="submit" class="go">SAVE</button><button type="button" id="sh-x">CANCEL</button></div>
+</form>
+<div id="toast" role="status"></div>
+<div id="sa" aria-hidden="true"></div>
+<script>
+(() => {
+'use strict';
+const doc = document, body = doc.body, $ = id => doc.getElementById(id);
+const APP = window.HubsApp || null;            // the Hubs app when this page is its home view; absent on the iPhone
+const Q = new URLSearchParams(location.search);
+const num = (k, d) => { const v = Number(Q.get(k)); return v > 0 ? v : d; };
+// ?idle= and ?dim= (ms) shorten the ambient view and the dimming, for the tests and a quick look
+const CFG = { idle: num('idle', 60e3), dim: num('dim', 600e3), first: 350, minRep: 60, stale: 900, staleOp: 2500, timeout: 2000, connect: 4000, watchdog: 50e3, slop: 12 };
+// the tablet reports "reduce motion" because Android's own animations are off for speed (10-28); inside an app the motion stays
+const INAPP = !!APP || /; wv\)/.test(navigator.userAgent);
+function openPit() {   // the Pit: the same native switch the HUB's own service grid uses, by name (not a fixed index)
+  if (APP && typeof APP.open === 'function') {
+    let i = 1;
+    try {
+      const list = JSON.parse(APP.services()).services || [];
+      const found = list.findIndex(x => /pit/i.test(x.name || ''));
+      if (found >= 0) i = found;
+    } catch (e) { /* keep the default index */ }
+    try { APP.open(i); return; } catch (e) { /* the app said no: fall through */ }
+  }
+  location.href = 'https://hectorfsv.github.io/the-pit/';
+}
+const MOTION = INAPP || !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const STREAMS = !!(window.ReadableStream && window.TextDecoder && window.Response && 'body' in Response.prototype) && Q.get('sse') !== 'es';
+const KEYNAME = 'hubs.remote.k';
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* a private window */ } },
+};
+const AUTH = { k: window.__hubsKey || store.get(KEYNAME) || null };
+try { delete window.__hubsKey; } catch (e) { /* an old engine */ }
+const S = { geo: null, front: null, adb: 'ok', v: '', auth: AUTH.k ? null : 'key', ambient: false, dimmed: false, loop: null, tIdle: 0, tDim: 0,
+  swallow: new Set(), swallowClick: 0, sheet: false, yt: null, ytFull: false, adbRefused: false, now: '', tiltT: 0, tilt: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)' };
+const NET = { state: 'boot', q: [], busy: false, fails: 0, ctl: null, es: null, gen: 0, retryT: 0, dog: 0, live: false, probeAt: 0, sent: 0, dropped: 0 };
+const APPS = { list: [], at: 0, busy: false };
+const PTR = new Map();                          // every finger (or the mouse) on a control, by pointerId
+const DIRS = ['up', 'right', 'down', 'left'];
+const VEC = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] };
+const ANG = { up: 0, right: 90, down: 180, left: 270 };
+const TILT = { up: [7, 0], down: [-7, 0], left: [0, -7], right: [0, 7] };   // a press tips the reactor like a rocker
+// the HUB's YouTube channels: keys and names copied word for word from index.html (LOUNGE.TV, shown as its chips). Keep them in step.
+const YT = [
+  { k: 'fox', short: 'FOX LiveNOW' }, { k: 'cnn', short: 'CNN' }, { k: 'abc', short: 'ABC News' }, { k: 'cbs', short: 'CBS News' },
+  { k: 'dw', short: 'DW News' }, { k: 'aje', short: 'Al Jazeera' }, { k: 'bbg', short: 'Bloomberg' },
+  { k: 'azteca', short: 'Azteca Noticias' }, { k: 'mmty', short: 'Multimedios MTY' }, { k: 'c5', short: 'Canal 5' },
+  { k: 'tdep', short: 'Telemundo Deportes' }, { k: 'lomlb', short: 'Locked On MLB' },
+];
+const YT_APP = 'com.amazon.firetv.youtube';
+
+// ---- icons (the HUB's stroke style) ----
+const SV = b => `<svg class="icn" viewBox="0 0 48 48" aria-hidden="true">${b}</svg>`;
+const SPK = '<path class="f" d="M7 19h6l8.5-7v24L13 29H7z"/>';
+const I = {
+  back: SV('<path d="M19 12 8 23l11 11"/><path d="M9 23h19.5c6.4 0 11 4.4 11 10s-4.6 10-11 10H23"/>'),
+  hub: SV('<circle cx="24" cy="24" r="14.5"/><circle class="f" cx="24" cy="24" r="6.5"/><path d="M24 4.5v5M24 38.5v5M4.5 24h5M38.5 24h5"/>'),
+  menu: SV('<path d="M12 15h24M12 24h24M12 33h24"/>'),
+  rew: SV('<path class="f" d="M22 14 9 24l13 10z"/><path class="f" d="M38 14 25 24l13 10z"/>'),
+  play: SV('<path class="f" d="M9 13v22l15-11z"/><path d="M31 14v20M39 14v20"/>'),
+  fwd: SV('<path class="f" d="M10 14l13 10-13 10z"/><path class="f" d="M26 14l13 10-13 10z"/>'),
+  volup: SV(SPK + '<path d="M29 24h11M34.5 18.5v11"/>'),
+  voldn: SV(SPK + '<path d="M29 24h11"/>'),
+  mute: SV(SPK + '<path d="M30 19l10 10M40 19 30 29"/>'),
+  power: SV('<path d="M24 7v15"/><path d="M15.2 12.8a14 14 0 1 0 17.6 0"/>'),
+  moon: SV('<path class="f" d="M34 31A13.5 13.5 0 0 1 18.5 11.5a14 14 0 1 0 15.5 19.5z"/>'),
+  search: SV('<circle cx="21" cy="21" r="10.5"/><path d="M29 29l10 10"/>'),
+  del: SV('<path d="M18 13h19a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H18L7 24z"/><path d="M24 19.5l9 9M33 19.5l-9 9"/>'),
+  enter: SV('<path d="M38 11v10a6 6 0 0 1-6 6H11"/><path d="M18 20l-7 7 7 7"/>'),
+  tv: SV('<rect x="6" y="10" width="36" height="24" rx="3"/><path d="M17 40h14M24 34v6"/>'),
+  stop: SV('<rect class="f" x="14" y="14" width="20" height="20" rx="3"/>'),
+  full: SV('<path d="M10 19v-9h9M29 10h9v9M38 29v9h-9M19 38h-9v-9"/>'),
+  pit: SV('<path d="M24 5.5c6.8 7.6 12 14.3 12 22a12 12 0 1 1-24 0c0-3.6 1.3-6.7 3.6-10.1.4 4.9 2.6 7.4 5 7.6-1.5-7.3.7-14 3.4-19.5z"/><path class="f" d="M24.3 23c2.1 3.4 3.6 6 3.6 8.7a3.9 3.9 0 1 1-7.8 0c0-1.1.4-2.1 1-3.4.3 1.7 1.1 2.5 1.8 2.6-.5-2.6.2-5.2 1.4-7.9z"/>'),
+};
+function fillIcons() {
+  doc.querySelectorAll('[data-ic]').forEach(el => {
+    const svg = I[el.dataset.ic] || '';
+    if (el.classList.contains('pod')) el.innerHTML = `<span class="orbr"></span><span class="glw"></span><span class="ring"></span><span class="face"></span><span class="icon">${svg}</span>`;
+    else el.insertAdjacentHTML('afterbegin', svg);
+  });
+}
+
+// ---- drawing: the reactor once, as SVG; its layers only turn or fade ----
+const P = (r, deg) => { const a = (deg - 90) * Math.PI / 180; return (r * Math.cos(a)).toFixed(2) + ' ' + (r * Math.sin(a)).toFixed(2); };
+const arc = (r, a0, a1) => `M${P(r, a0)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${P(r, a1)}`;
+const sector = (r0, r1, a0, a1) => `M${P(r1, a0)}A${r1} ${r1} 0 0 1 ${P(r1, a1)}L${P(r0, a1)}A${r0} ${r0} 0 0 0 ${P(r0, a0)}Z`;
+const CHEV = 'M-8.5 -54L0 -62.5L8.5 -54';
+function ticks(rBig, rSmall, rOut) {
+  let mi = '', ma = '';
+  for (let a = 0; a < 360; a += 3) { if (a % 15) mi += `M${P(rSmall, a)}L${P(rOut, a)}`; else ma += `M${P(rBig, a)}L${P(rOut, a)}`; }
+  return `<path d="${mi}" stroke="#FFB547" stroke-width=".55" opacity=".5"/><path d="${ma}" stroke="#FFD27A" stroke-width="1.1" opacity=".9"/>`;
+}
+function drawReactor() {
+  let notch = '', tri = '';
+  for (const a of [45, 135, 225, 315]) notch += `M${P(91.5, a)}L${P(100.5, a)}`;
+  for (const a of [0, 90, 180, 270]) tri += `M${P(92.5, a)}L${P(98, a - 2.6)}L${P(98, a + 2.6)}Z`;
+  $('r-static').innerHTML = '<circle r="99" fill="none" stroke="#FFB547" stroke-width=".5" opacity=".45"/><circle r="95.5" fill="none" stroke="#FFB547" stroke-width=".35" opacity=".22"/>'
+    + `<path d="${notch}" stroke="#FFD27A" stroke-width="1.2" opacity=".7"/><path d="${tri}" fill="#FFB547" opacity=".9"/>`
+    + '<circle r="81" fill="none" stroke="#FFB547" stroke-width=".4" opacity=".32"/><circle r="40" fill="none" stroke="#FFB547" stroke-width=".55" stroke-dasharray=".8 2.3" opacity=".7"/>';
+  $('r-ticks').firstElementChild.innerHTML = ticks(82.5, 85.5, 90);
+  let seg = '<defs><radialGradient id="r-pf" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="80"><stop offset=".5" stop-color="#25180F"/><stop offset="1" stop-color="#0F0906"/></radialGradient>'
+    + '<linearGradient id="r-sg" gradientUnits="userSpaceOnUse" x1="0" y1="-80" x2="0" y2="80"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#FFB547"/><stop offset="1" stop-color="#B8741A"/></linearGradient></defs>';
+  DIRS.forEach((d, i) => {
+    const c = i * 90;
+    seg += `<path d="${sector(41.5, 79, c - 41, c + 41)}" fill="url(#r-pf)" stroke="#FFB547" stroke-opacity=".34" stroke-width=".6"/>`
+      + `<path d="${arc(75, c - 31, c + 31)}" fill="none" stroke="url(#r-sg)" stroke-width="1.8" opacity=".85"/>`
+      + `<path d="${arc(75, c - 5, c + 5)}" fill="none" stroke="#FFF1CC" stroke-width=".9" opacity=".9"/>`
+      + `<path d="${arc(45, c - 36, c + 36)}" fill="none" stroke="#FFB547" stroke-width=".5" opacity=".35"/>`
+      + `<path d="${CHEV}" transform="rotate(${c})" fill="none" stroke="#FFD27A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+  });
+  $('r-seg').innerHTML = seg;
+}
+// a segment lit: drawn once for "up", each copy turned to its direction; only its opacity ever changes
+function flareSvg(i) {
+  return `<svg viewBox="-100 -100 200 200" aria-hidden="true"><defs><radialGradient id="fh${i}" gradientUnits="userSpaceOnUse" cx="0" cy="-60" r="50"><stop offset="0" stop-color="#FFF1CC" stop-opacity=".85"/><stop offset=".45" stop-color="#FFB547" stop-opacity=".4"/><stop offset="1" stop-color="#FF8C28" stop-opacity=".06"/></radialGradient></defs>`
+    + `<path d="${sector(41.5, 79, -41, 41)}" fill="url(#fh${i})" stroke="#FFE9B0" stroke-opacity=".85" stroke-width="1.1"/>`
+    + `<path d="${arc(85, -40, 40)}" fill="none" stroke="#FFB547" stroke-opacity=".16" stroke-width="12" stroke-linecap="round"/>`
+    + `<path d="${arc(85, -38, 38)}" fill="none" stroke="#FFC46B" stroke-opacity=".42" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="${arc(85, -36, 36)}" fill="none" stroke="#FFF6DA" stroke-width="1.6" stroke-linecap="round"/>`
+    + `<path d="${CHEV}" fill="none" stroke="#FFE9B0" stroke-opacity=".4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="${CHEV}" fill="none" stroke="#FFFDF5" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+// the ambient view's ring: the HUB's own reactor, drawn the HUB's way
+function drawAmbient() {
+  const c = 2 * Math.PI * 76, a = c * 84 / 360, g = c * 36 / 360;
+  let tri = '', notch = '';
+  for (const x of [0, 90, 180, 270]) tri += `M${P(93, x)}L${P(97.5, x - 2.4)}L${P(97.5, x + 2.4)}Z`;
+  for (const x of [45, 135, 225, 315]) notch += `M${P(93.5, x)}L${P(101, x)}`;
+  $('a-ring').innerHTML = '<defs><linearGradient id="a-sg" x1="0" y1="-1" x2="0" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#FFB547"/><stop offset="1" stop-color="#B8741A"/></linearGradient></defs>'
+    + '<circle r="99" fill="none" stroke="#FFB547" stroke-width=".5" opacity=".45"/><circle r="95.5" fill="none" stroke="#FFB547" stroke-width=".35" opacity=".22"/>'
+    + `<path d="${notch}" stroke="#FFD27A" stroke-width="1.2" opacity=".7"/>` + ticks(81.5, 84.5, 90) + `<path d="${tri}" fill="#FFB547" opacity=".85"/>`
+    + '<circle r="71" fill="none" stroke="#FFB547" stroke-width=".4" opacity=".4"/><circle r="81" fill="none" stroke="#FFB547" stroke-width=".4" opacity=".3"/>'
+    + `<circle r="76" fill="none" stroke="url(#a-sg)" stroke-width="5" stroke-dasharray="${a.toFixed(2)} ${g.toFixed(2)}" transform="rotate(-132)" opacity=".95"/>`
+    + `<circle r="76" fill="none" stroke="#FFF1CC" stroke-width=".8" stroke-dasharray="${(a * .18).toFixed(2)} ${(a * .82 + g).toFixed(2)}" transform="rotate(-132)" opacity=".9"/>`
+    + '<circle r="67" fill="none" stroke="#FFB547" stroke-width="1.1" stroke-dasharray=".9 3.1" opacity=".62"/>';
+}
+const FX = { fl: {}, wv: [], sp: [], wi: 0, si: 0, tick: 0, cf: null, dot: null };
+function buildFx() {
+  // the still drawing (rings, plates, core) comes first in the layer; what moves comes after it, so nothing is painted over a moving piece
+  const t = $('tilt'), cf = $('cflash');
+  DIRS.forEach((d, i) => { const f = doc.createElement('div'); f.className = 'fl'; f.style.transform = `rotate(${i * 90}deg)`; f.innerHTML = flareSvg(i); t.insertBefore(f, cf); FX.fl[d] = f; });
+  for (let i = 0; i < 3; i++) { const w = doc.createElement('div'); w.className = 'wave'; t.appendChild(w); FX.wv.push(w); }
+  for (let i = 0; i < 18; i++) { const s = doc.createElement('i'); s.className = 'sp'; t.appendChild(s); FX.sp.push(s); }
+  FX.cf = $('cflash'); FX.dot = $('dot');
+}
+
+// ---- layout: the tablet upright is the main one; sideways and the iPhone too ----
+function layout(force) {
+  const W = innerWidth, H = innerHeight;
+  if (!force && S.geo && S.geo.W === W && (S.sheet || doc.activeElement === $('type-in'))) return;   // the keyboard is up: hold still
+  const land = W > H * 1.1, st = doc.documentElement.style;
+  body.classList.toggle('land', land);
+  const topB = Math.ceil($('top').getBoundingClientRect().bottom);
+  st.setProperty('--deckT', topB + 'px');
+  const L = $('side-l'), Rt = $('side-r'), gut = 14, side = W < 400 ? 48 : 54, sg = 12;
+  const fit = (sw, sh, sides) => {   // the biggest reactor that fits, with room for the pods and their labels below it
+    let rp = 30, R = 0;
+    for (const r of [30, 27, 24]) { rp = r; R = Math.min((sh - 2 * rp - 54) / 2, (sw - 2 * gut - (sides ? 2 * (side + sg) : 0)) / 2, sides ? 230 : W * .43); if (R >= 150) break; }
+    return { R: Math.max(70, Math.floor(R)), rp };
+  };
+  if ($('sides').children.length) { $('stage').append(L, Rt); L.style.cssText = Rt.style.cssText = ''; }
+  let sw, sh, f, narrow = false;
+  if (land) {
+    const dw = Math.round(clamp(W * .4, 300, 440));
+    st.setProperty('--deckW', dw + 'px');
+    sw = W - dw - 22; sh = H - topB - Math.max(12, $('sa').offsetHeight);
+    f = fit(sw, sh, true);
+  } else {
+    sw = W; sh = $('deck').getBoundingClientRect().top - topB - 4;
+    f = fit(sw, sh, true);
+    const g = fit(sw, sh - 69, false);   // the side keys as a row in the deck (58 px and a gap)
+    if (g.R > f.R + 16) { narrow = true; f = g; $('sides').append(L, Rt); sh = $('deck').getBoundingClientRect().top - topB - 4; }
+  }
+  body.classList.toggle('narrow', narrow);
+  const { R, rp } = f, Ro = R + 22 + rp, block = 2 * R + 22 + 2 * rp + 30;
+  const cx = Math.round(sw / 2), cy = Math.round(topB + Math.max(4, (sh - block) / 2) + R);
+  S.geo = { W, H, R, cx, cy, Ro, rp, land, narrow };
+  st.setProperty('--R', R + 'px');
+  st.setProperty('--bgX', (cx / W * 100).toFixed(1) + '%'); st.setProperty('--bgY', (cy / H * 100).toFixed(1) + '%');
+  Object.assign($('reactor').style, { left: cx - R + 'px', top: cy - R + 'px', width: 2 * R + 'px', height: 2 * R + 'px' });
+  Object.assign($('halo').style, { left: cx - R * 1.6 + 'px', top: cy - R * 1.6 + 'px', width: 3.2 * R + 'px', height: 3.2 * R + 'px' });
+  const o = $('orbit');
+  Object.assign(o.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
+  o.setAttribute('viewBox', `${-Ro} ${-Ro} ${2 * Ro} ${2 * Ro}`); $('orbit-c').setAttribute('r', Ro);
+  [130, 90, 50].forEach((deg, i) => {   // BACK, HUB, MENU on the orbit, where the HUB keeps its pods
+    const a = deg * Math.PI / 180, x = cx + Ro * Math.cos(a), y = cy + Ro * Math.sin(a), p = doc.querySelectorAll('.pod')[i];
+    Object.assign(p.style, { left: x - rp + 'px', top: y - rp + 'px', width: 2 * rp + 'px', height: 2 * rp + 'px' });
+    Object.assign($('pl' + i).style, { left: x + 'px', top: y + rp + 7 + 'px' });
+  });
+  if (!narrow) {
+    L.style.width = Rt.style.width = side + 'px';
+    L.style.left = Math.max(gut, cx - R - sg - side) + 'px'; Rt.style.left = Math.min(sw - gut - side, cx + R + sg) + 'px';
+    L.style.top = cy - L.offsetHeight / 2 + 'px'; Rt.style.top = cy - Rt.offsetHeight / 2 + 'px';
+  }
+  st.setProperty('--D', Math.round(clamp(Math.min(W - 56, (H - 200) * .9), 200, 540)) + 'px');
+}
+
+// ---- feedback: instant, local, and only transform or opacity ----
+const cancelAll = el => el.getAnimations().forEach(a => a.cancel());
+const opac = el => +getComputedStyle(el).opacity || 0;
+function fade(el, to, ms, from) {
+  const f = from == null ? opac(el) : from;
+  cancelAll(el); el.style.opacity = to;
+  if (Math.abs(f - to) > .01) el.animate([{ opacity: f }, { opacity: to }], { duration: ms, easing: 'ease-out' });
+}
+const flareOn = d => fade(FX.fl[d], 1, 70, Math.max(.35, opac(FX.fl[d])));
+const flareOff = (d, ms) => fade(FX.fl[d], 0, ms || 340);
+function flarePulse(d) {
+  const el = FX.fl[d], held = el.style.opacity === '1';
+  cancelAll(el);
+  el.animate(held ? [{ opacity: .5 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }], { duration: held ? 140 : 380, easing: 'ease-out' });
+}
+function tilt(rx, ry, sc, ms, ease) {
+  const el = $('tilt'), to = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${sc})`;
+  if (to === S.tilt && !el.getAnimations().length) return;   // already there: nothing to move
+  const from = getComputedStyle(el).transform;
+  S.tilt = to; cancelAll(el); el.style.transform = to;
+  if (MOTION && from && from !== 'none') el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: ease || 'ease-out' });
+}
+const tiltIn = (d, k) => { const v = TILT[d] || [0, 0], m = k || 1; tilt(v[0] * m, v[1] * m, d ? 1 : .965, 70); };
+// back to rest with a spring, or to the direction another finger still holds
+function settle() {
+  clearTimeout(S.tiltT);
+  let held = null; PTR.forEach(p => { if (p.kind === 'pad' && p.live) held = p.d; });
+  if (held) tiltIn(held); else tilt(0, 0, 1, 460, 'cubic-bezier(.25,1.7,.45,1)');
+}
+function wave(dx, dy, strong, delay) {
+  if (!MOTION) return;
+  const el = FX.wv[FX.wi++ % FX.wv.length], R = S.geo ? S.geo.R : 160;
+  cancelAll(el);
+  el.animate([{ transform: 'translate(0px,0px) scale(.85)', opacity: strong ? 1 : .85 },
+    { transform: `translate(${(dx * R * .2).toFixed(1)}px,${(dy * R * .2).toFixed(1)}px) scale(${strong ? 2.75 : 2.15})`, opacity: 0 }],
+    { duration: strong ? 640 : 500, delay: delay || 0, easing: 'cubic-bezier(.1,.7,.3,1)' });
+}
+function sparks(n, x, y, ang, spread, dist) {   // reactor-centred px; ang in degrees, 0 = up
+  if (!MOTION) return;
+  for (let i = 0; i < n; i++) {
+    const el = FX.sp[FX.si++ % FX.sp.length], a = (ang + (Math.random() - .5) * spread) * Math.PI / 180, d = dist * (.55 + Math.random() * .7);
+    const x1 = x + Math.sin(a) * d, y1 = y - Math.cos(a) * d, s = .7 + Math.random() * .9;
+    cancelAll(el);
+    el.animate([
+      { transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${s.toFixed(2)})`, opacity: 1 },
+      { transform: `translate(${((x + x1) / 2).toFixed(1)}px,${((y + y1) / 2 - 3).toFixed(1)}px) scale(${(s * .85).toFixed(2)})`, opacity: .95, offset: .3 },
+      { transform: `translate(${x1.toFixed(1)}px,${(y1 + 5).toFixed(1)}px) scale(${(s * .25).toFixed(2)})`, opacity: 0 },
+    ], { duration: 420 + Math.random() * 360, easing: 'cubic-bezier(.15,.7,.35,1)' });
+  }
+}
+function detent(d, k) {   // the tick ring clicks round a notch per press, like a dial
+  if (!MOTION) return;
+  const el = $('r-ticks'), from = getComputedStyle(el).transform;
+  FX.tick = (FX.tick + (d === 'right' || d === 'down' ? 6 : -6) * (k || 1)) % 360;
+  cancelAll(el); el.style.transform = `rotate(${FX.tick}deg)`;
+  el.animate([{ transform: from && from !== 'none' ? from : 'rotate(0deg)' }, { transform: `rotate(${FX.tick}deg)` }], { duration: 170, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+}
+function denied() {   // a press that could not go: the chip (or the banner) shakes
+  const el = !$('banner').hidden ? $('banner') : $('chip');
+  if (el.hidden || Date.now() - (denied.at || 0) < 260) return;
+  denied.at = Date.now();
+  el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(5px)' }, { transform: 'translateX(-3px)' }, { transform: 'translateX(0)' }], { duration: 320, easing: 'ease-out' });
+}
+function boot() {   // the reactor powers up: the dial spins in, the light runs round the four segments, the core fires
+  if (!MOTION) return;
+  $('r-ticks').animate([{ transform: 'rotate(-140deg)' }, { transform: 'rotate(0deg)' }], { duration: 1500, easing: 'cubic-bezier(.15,.85,.25,1)' });
+  DIRS.forEach((d, i) => FX.fl[d].animate([{ opacity: 0 }, { opacity: .9, offset: .3 }, { opacity: 0 }], { duration: 520, delay: 260 + i * 120, easing: 'ease-out' }));
+  FX.cf.animate([{ opacity: 0 }, { opacity: .85, offset: .3 }, { opacity: 0 }], { duration: 700, delay: 760, easing: 'ease-out' });
+  wave(0, 0, true, 780);
+}
+
+// ---- the stick: one queue, in order; a key that cannot go now is dropped, never sent late ----
+function call(path, body) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), CFG.timeout), h = { 'X-Hubs-Key': AUTH.k || '' };
+  if (body) h['Content-Type'] = 'application/json';
+  return fetch(path, { method: body ? 'POST' : 'GET', headers: h, body: body ? JSON.stringify(body) : undefined, signal: c.signal, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' })
+    .finally(() => clearTimeout(t));
+}
+function enqueue(kind, o) {
+  if (S.auth === 'key' || !AUTH.k) { denied(); return false; }
+  if (NET.state === 'offline') { NET.dropped++; denied(); probe(); return false; }
+  if ((kind === 'key' || kind === 'text') && S.adb === 'asking') { NET.dropped++; denied(); return false; }
+  const tail = NET.q[NET.q.length - 1];
+  if (tail && kind === 'key' && tail.kind === 'key' && tail.k === o.k && tail.n + o.n <= 10) tail.n += o.n;          // presses still waiting ride together
+  else if (tail && kind === 'text' && tail.kind === 'text' && tail.text.length + o.text.length <= 200) tail.text += o.text;
+  else NET.q.push(Object.assign({ kind, at: performance.now() }, o));
+  pump();
+  return true;
+}
+const send = (k, n) => enqueue('key', { k, n: n || 1 });
+async function pump() {
+  if (NET.busy) return;
+  NET.busy = true;
+  try {
+    while (NET.q.length) {
+      const o = NET.q.shift();
+      if (performance.now() - o.at > (o.kind === 'key' ? CFG.stale : CFG.staleOp)) { NET.dropped++; continue; }   // too late to mean anything
+      const b = o.kind === 'key' ? { k: o.k, n: o.n } : o.kind === 'text' ? { text: o.text } : o.kind === 'launch' ? { pkg: o.pkg } : o.body;
+      let r;
+      try { r = await call('/api/' + o.kind, b); } catch (e) { NET.dropped += 1 + NET.q.length; NET.q.length = 0; lost(); break; }
+      if (r.status === 401) { NET.q.length = 0; needKey(); break; }
+      gotAnswer();
+      if (r.ok) {
+        NET.sent++;
+        if ((o.kind === 'key' || o.kind === 'text') && (S.adbRefused || S.adb !== 'ok')) { S.adbRefused = false; if (S.adb === 'off') S.adb = 'ok'; renderStatus(); }
+        continue;
+      }
+      let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
+      if (r.status === 503 && j && j.error === 'adb') { NET.q = NET.q.filter(x => x.kind !== 'key' && x.kind !== 'text'); adbState(j.adb, true); continue; }
+      if (r.status === 404 && o.kind === 'launch') { toast("THAT APP ISN'T ON THE TV"); loadApps(true); continue; }
+      toast('THE STICK SAID ' + r.status);
+    }
+  } finally { NET.busy = false; }
+}
+function adbState(a, refused) {
+  S.adb = a === 'asking' || a === 'off' ? a : 'ok';
+  S.adbRefused = S.adb === 'off' && (!!refused || S.adbRefused);
+  renderStatus();
+}
+function setNet(s) { if (NET.state !== s) { NET.state = s; renderStatus(); } }
+function lost() { if (NET.state === 'ok' || NET.state === 'boot') setNet('reconnecting'); connect(); }   // a call got no answer: the stream decides
+function gotAnswer() { if (NET.state !== 'ok') { NET.fails = 0; if (NET.live) setNet('ok'); else if (!NET.ctl && !NET.es) connect(); } }
+function probe() { if (Date.now() - NET.probeAt > 1500) { NET.probeAt = Date.now(); connect(); } }   // a press while offline asks again at once
+function needKey() { S.auth = 'key'; closeStream(); NET.q.length = 0; renderStatus(); renderNow(); }
+
+// the live state: server-sent events read from a fetch, so the 20-s pings prove the stick is there (EventSource hides them)
+function closeStream() {
+  NET.gen++; NET.live = false; clearTimeout(NET.dog);
+  if (NET.ctl) { try { NET.ctl.abort(); } catch (e) { /* gone */ } NET.ctl = null; }
+  if (NET.es) { NET.es.close(); NET.es = null; }
+}
+function connect() {
+  clearTimeout(NET.retryT);
+  closeStream();
+  if (doc.hidden || !AUTH.k || S.auth === 'key') return;
+  const gen = NET.gen;
+  if (STREAMS) streamFetch(gen); else streamES(gen);
+}
+async function streamFetch(gen) {
+  const c = new AbortController(); NET.ctl = c;
+  const dog = ms => { clearTimeout(NET.dog); NET.dog = setTimeout(() => { if (gen === NET.gen) c.abort(); }, ms); };
+  dog(CFG.connect);
+  try {
+    const r = await fetch('/api/events?k=' + encodeURIComponent(AUTH.k), { signal: c.signal, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', headers: { Accept: 'text/event-stream' } });
+    if (gen !== NET.gen) return;
+    if (r.status === 401) { needKey(); return; }
+    if (!r.ok || !r.body) throw new Error('events ' + r.status);
+    opened(); dog(CFG.watchdog);
+    const rd = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read();
+      if (gen !== NET.gen) { try { rd.cancel(); } catch (e) { /* gone */ } return; }
+      if (done) break;
+      dog(CFG.watchdog);
+      buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+      for (let i; (i = buf.indexOf('\n\n')) >= 0;) { sseBlock(buf.slice(0, i)); buf = buf.slice(i + 2); }
+    }
+  } catch (e) { /* refused, cut or silent too long: the same answer */ }
+  if (gen === NET.gen) dropped();
+}
+function streamES(gen) {   // the fallback for a browser that cannot read a stream
+  let es; try { es = new EventSource('/api/events?k=' + encodeURIComponent(AUTH.k)); } catch (e) { dropped(); return; }
+  NET.es = es;
+  es.onopen = () => { if (gen === NET.gen) opened(); };
+  es.addEventListener('state', e => { if (gen === NET.gen) try { applyState(JSON.parse(e.data)); } catch (x) { /* a torn event */ } });
+  es.onerror = () => {
+    if (gen !== NET.gen) return;
+    es.close(); NET.es = null;
+    call('/api/state').then(r => { if (gen === NET.gen) { if (r.status === 401) needKey(); else dropped(); } }, () => { if (gen === NET.gen) dropped(); });
+  };
+}
+function sseBlock(block) {
+  let ev = 'message', data = '';
+  for (const line of block.split('\n')) {
+    if (!line || line[0] === ':') continue;   // ": ping"
+    const i = line.indexOf(':'), f = i < 0 ? line : line.slice(0, i);
+    let v = i < 0 ? '' : line.slice(i + 1); if (v[0] === ' ') v = v.slice(1);
+    if (f === 'event') ev = v; else if (f === 'data') data += (data ? '\n' : '') + v;
+  }
+  if (ev === 'state' && data) try { applyState(JSON.parse(data)); } catch (e) { /* a torn event */ }
+}
+function opened() { NET.live = true; NET.fails = 0; S.auth = null; setNet('ok'); renderStatus(); loadApps(); }
+function dropped() {
+  NET.live = false; NET.ctl = null;
+  if (S.auth === 'key' || doc.hidden) return;
+  NET.fails++;
+  setNet(NET.fails >= 2 ? 'offline' : 'reconnecting');
+  clearTimeout(NET.retryT);
+  NET.retryT = setTimeout(connect, [400, 1000, 2000, 3000, 5000][Math.min(NET.fails - 1, 4)]);
+}
+function applyState(st) {
+  if (!st || typeof st !== 'object') return;
+  const was = S.front;
+  S.front = st.front && typeof st.front === 'object' ? st.front : null;
+  S.v = typeof st.v === 'string' ? st.v : S.v;
+  adbState(st.adb, false);
+  if (S.front && !S.front.hub && (!was || was.hub)) { S.yt = null; S.ytFull = false; paintYT(); }   // the HUB left the screen: its video is off
+  if (S.front && S.front.pkg && !S.front.hub && APPS.at && !APPS.list.some(a => a.pkg === S.front.pkg) && Date.now() - APPS.at > 60e3) loadApps(true);
+  renderNow();
+}
+
+// ---- what is on the TV, the link, the apps, YouTube ----
+function renderStatus() {
+  let chip = '', cls = '', off = false;
+  if (S.auth === 'key') { chip = 'KEY NEEDED'; cls = 'bad'; off = true; }
+  else if (NET.state === 'offline') { chip = 'STICK OFFLINE'; cls = 'bad'; off = true; }
+  else if (NET.state === 'reconnecting') { chip = 'RECONNECTING'; cls = 'wait'; }
+  else if (S.adb === 'asking') { chip = 'PRESS OK ON THE TV ONCE'; cls = 'ask'; }
+  else if (S.adb === 'off' && S.adbRefused) { chip = 'KEYS RETRYING · PRESS AGAIN'; cls = 'wait'; }
+  const c = $('chip');
+  c.hidden = !chip; c.textContent = chip; c.className = cls;
+  $('link').hidden = !!chip;
+  $('link').classList.toggle('on', NET.state === 'ok');
+  $('link-t').textContent = NET.state === 'ok' ? 'LINKED' + (S.v ? ' · HUBS ' + S.v : '') : 'LINKING';
+  $('banner').hidden = !(S.adb === 'asking' && NET.state === 'ok' && S.auth !== 'key');
+  body.classList.toggle('off', off);
+}
+function nowInfo() {
+  const f = S.front;
+  if (S.auth === 'key') return { name: 'KEY NEEDED', glyph: I.tv, key: '!' };
+  if (!f) return { name: NET.live ? '—' : 'LINKING…', glyph: I.tv, key: '' };
+  if (f.hub) return { name: 'THE HUB', glyph: I.hub, key: 'hub' };
+  const a = APPS.list.find(x => x.pkg === f.pkg);
+  const icon = a && /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/=]+$/.test(a.icon || '') ? a.icon : null;
+  return { name: String(f.name || (a && a.name) || f.pkg || 'TV').toUpperCase(), icon, glyph: I.tv, key: String(f.pkg || '') };
+}
+function paintIc(el, n) {
+  if (n.icon) { const im = new Image(); im.alt = ''; im.src = n.icon; el.replaceChildren(im); } else el.innerHTML = n.glyph;
+}
+function renderNow() {
+  const n = nowInfo(), sig = n.name + '|' + n.key + '|' + (n.icon ? n.icon.length : 0);
+  doc.querySelectorAll('.orb').forEach(o => o.classList.toggle('live', !!S.front && !S.front.hub && o.dataset.pkg === S.front.pkg));
+  if (sig === S.now) return;
+  const first = !S.now; S.now = sig;
+  $('now-name').textContent = n.name; paintIc($('now-ic'), n);
+  $('a-name').textContent = n.name; paintIc($('a-ic'), n);
+  if (!first && MOTION) $('now').animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0px)' }], { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1)' });
+}
+async function loadApps(force) {
+  if (APPS.busy || !AUTH.k || S.auth === 'key' || (!force && APPS.at && Date.now() - APPS.at < 5 * 60e3)) return;
+  APPS.busy = true;
+  try {
+    const r = await call('/api/apps');
+    if (r.status === 401) { needKey(); return; }
+    if (!r.ok) return;
+    const l = await r.json();
+    APPS.list = Array.isArray(l) ? l.filter(a => a && typeof a.pkg === 'string' && typeof a.name === 'string').slice(0, 40) : [];
+    APPS.at = Date.now();
+    renderApps(); S.now = ''; renderNow();
+  } catch (e) { /* the stream decides about offline */ } finally { APPS.busy = false; }
+}
+function renderApps() {
+  const rail = $('apps-rail');
+  rail.replaceChildren();
+  if (!APPS.list.length) { const s = doc.createElement('span'); s.className = 'none'; s.textContent = 'NO APPS YET'; rail.appendChild(s); return; }
+  APPS.list.forEach(a => {
+    const b = doc.createElement('button'), i = doc.createElement('i'), n = doc.createElement('b');
+    b.type = 'button'; b.className = 'orb'; b.dataset.pkg = a.pkg; b.setAttribute('aria-label', 'Open ' + a.name);
+    if (/^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/=]+$/.test(a.icon || '')) { const im = new Image(); im.alt = ''; im.src = a.icon; im.draggable = false; i.appendChild(im); }
+    n.textContent = a.name.toUpperCase(); b.append(i, n);
+    tapEl(b, () => launch(a));
+    rail.appendChild(b);
+  });
+}
+function launch(a) {
+  if (enqueue('launch', { pkg: a.pkg })) toast('OPENING ' + a.name.toUpperCase());
+}
+function buildYT() {
+  const rail = $('yt-rail');
+  YT.forEach(c => {
+    const b = doc.createElement('button'); b.type = 'button'; b.className = 'ch'; b.dataset.k = c.k; b.textContent = c.short.toUpperCase();
+    tapEl(b, () => { if (enqueue('hub', { body: { do: 'yt', k: c.k } })) { S.yt = c.k; S.ytFull = false; paintYT(); } });
+    rail.appendChild(b);
+  });
+  const y = doc.createElement('button'); y.type = 'button'; y.className = 'ch'; y.dataset.k = 'app'; y.textContent = 'YOUTUBE APP ▸';
+  tapEl(y, () => { if (enqueue('launch', { pkg: YT_APP })) { S.yt = null; S.ytFull = false; paintYT(); toast('OPENING YOUTUBE'); } });
+  rail.appendChild(y);
+  tapEl($('yt-stop'), () => { if (enqueue('hub', { body: { do: 'yt-stop' } })) { S.yt = null; S.ytFull = false; paintYT(); } });
+  tapEl($('yt-full'), () => { const on = !S.ytFull; if (enqueue('hub', { body: { do: 'yt-full', on } })) { S.ytFull = on; paintYT(); } });
+}
+function paintYT() {
+  doc.querySelectorAll('#yt-rail .ch').forEach(b => b.classList.toggle('on', b.dataset.k === S.yt));
+  $('yt-full').classList.toggle('on', S.ytFull);
+}
+
+// ---- touch: the reactor ----
+function zone(x, y) {
+  const g = S.geo; if (!g) return null;
+  const dx = x - g.cx, dy = y - g.cy, r = Math.hypot(dx, dy) / g.R;
+  if (r <= .4) return 'core';
+  if (r > 1.04) return null;
+  return DIRS[Math.floor(((Math.atan2(dx, -dy) * 180 / Math.PI) + 405) % 360 / 90) % 4];   // each quarter runs gap to gap
+}
+const step = () => Math.round(clamp((S.geo ? S.geo.R : 160) * .24, 30, 48));   // trackpad: px of travel per press
+function arrow(d, n, how) {
+  const ok = send(d, n), R = S.geo ? S.geo.R : 160, v = VEC[d];
+  if (how === 'press') { flareOn(d); tiltIn(d); wave(v[0], v[1], false); sparks(7, v[0] * R * .62, v[1] * R * .62, ANG[d], 80, R * .55); detent(d, 1); }
+  else if (how === 'rep') { flarePulse(d); sparks(2, v[0] * R * .62, v[1] * R * .62, ANG[d], 50, R * .42); detent(d, 1); }
+  else {   // a trackpad step: n presses at once
+    flarePulse(d); detent(d, n);
+    const t = FX.dot.style.transform.match(/-?[\d.]+/g) || [0, 0];
+    sparks(Math.min(1 + n, 4), +t[0], +t[1], ANG[d], 40, R * .38);
+    tiltIn(d, .5); clearTimeout(S.tiltT); S.tiltT = setTimeout(settle, 150);
+  }
+  return ok;
+}
+function padPress(p) {
+  arrow(p.d, 1, 'press');
+  p.t = setTimeout(function rep() {   // a hold repeats: 350 ms, then faster and faster
+    if (!p.live) return;
+    p.n++; arrow(p.d, 1, 'rep');
+    p.t = setTimeout(rep, Math.max(CFG.minRep, Math.round(180 * Math.pow(.86, p.n - 1))));
+  }, CFG.first);
+}
+function padStop(p) { if (!p.live) return; p.live = false; clearTimeout(p.t); flareOff(p.d); settle(); }
+function coreDown() { fade(FX.cf, .5, 80); tilt(0, 0, .965, 80); }
+function coreUp(fire) {
+  const R = S.geo ? S.geo.R : 160;
+  if (fire) {
+    send('select', 1);
+    cancelAll(FX.cf); FX.cf.style.opacity = 0;
+    FX.cf.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 560, easing: 'ease-out' });
+    wave(0, 0, true); wave(0, 0, false, 90); sparks(12, 0, 0, 0, 360, R * .85);
+  } else fade(FX.cf, 0, 220);
+  settle();
+}
+function dotMove(x, y) { const g = S.geo; FX.dot.style.transform = `translate(${(x - g.cx).toFixed(1)}px,${(y - g.cy).toFixed(1)}px)`; }
+function track(p, x, y) {
+  dotMove(x, y);
+  const st = step(), out = [];
+  let dx = x - p.ax, dy = y - p.ay;
+  while (Math.abs(dx) >= st || Math.abs(dy) >= st) {   // the dominant axis wins; the other axis starts again from here
+    if (Math.abs(dx) >= Math.abs(dy)) { const s = Math.sign(dx); out.push(s > 0 ? 'right' : 'left'); p.ax += s * st; p.ay = y; dx = x - p.ax; dy = 0; }
+    else { const s = Math.sign(dy); out.push(s > 0 ? 'down' : 'up'); p.ay += s * st; p.ax = x; dy = y - p.ay; dx = 0; }
+  }
+  for (let i = 0; i < out.length;) {   // a fast swipe: one call with n presses
+    let j = i; while (j < out.length && out[j] === out[i]) j++;
+    for (let left = j - i; left > 0; left -= 10) arrow(out[i], Math.min(10, left), 'step');
+    i = j;
+  }
+}
+const RE = $('reactor');
+RE.addEventListener('pointerdown', e => {
+  if (e.button > 0) return;
+  const z = zone(e.clientX, e.clientY);
+  if (!z) return;
+  e.preventDefault();
+  try { RE.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
+  if (z === 'core') { PTR.set(e.pointerId, { kind: 'core', x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY, drag: false }); coreDown(); return; }
+  const p = { kind: 'pad', d: z, live: true, n: 0, t: 0 };
+  PTR.set(e.pointerId, p);
+  padPress(p);
+});
+
+// ---- touch: every other key (pressed on pointerdown; the hold-to-repeat ones repeat) ----
+function bindKey(el) {
+  const k = el.dataset.key, rep = el.hasAttribute('data-rep');
+  el.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    e.preventDefault();                       // and the typing field keeps the keyboard
+    try { el.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
+    const p = { kind: 'key', el, k, live: true, n: 0, t: 0 };
+    PTR.set(e.pointerId, p);
+    keyPress(el, k);
+    if (rep) p.t = setTimeout(function again() {
+      if (!p.live) return;
+      p.n++; keyPress(el, k);
+      p.t = setTimeout(again, Math.max(CFG.minRep + 20, Math.round(180 * Math.pow(.86, p.n - 1))));
+    }, CFG.first);
+  });
+  el.addEventListener('click', e => { if (e.detail === 0) { keyPress(el, k); setTimeout(() => el.classList.remove('down'), 140); } });   // a keyboard's Enter or Space
+}
+function keyPress(el, k) {
+  send(k, 1);
+  el.classList.add('down');
+  if (k === 'enter') clearType();
+}
+function keyStop(p) { if (!p.live) return; p.live = false; clearTimeout(p.t); p.el.classList.remove('down'); }
+const near = (el, x, y) => { const r = el.getBoundingClientRect(); return x > r.left - 16 && x < r.right + 16 && y > r.top - 16 && y < r.bottom + 16; };
+// a tap on something in a row that scrolls sideways (the apps, the channels): on click, so a swipe only scrolls
+function tapEl(el, fn) {
+  el.addEventListener('pointerdown', () => el.classList.add('down'));
+  const up = () => el.classList.remove('down');
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(t, up);
+  el.addEventListener('click', e => { e.preventDefault(); up(); fn(); });
+}
+window.addEventListener('pointermove', e => {
+  const p = PTR.get(e.pointerId); if (!p) return;
+  if (p.kind === 'pad') { if (p.live && zone(e.clientX, e.clientY) !== p.d) padStop(p); return; }   // off its segment: the repeat stops
+  if (p.kind === 'key') { if (p.live && !near(p.el, e.clientX, e.clientY)) keyStop(p); return; }
+  if (!p.drag) {
+    if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CFG.slop) return;
+    p.drag = true; fade(FX.cf, 0, 200); settle(); dotMove(e.clientX, e.clientY); fade(FX.dot, 1, 120);
+  }
+  track(p, e.clientX, e.clientY);
+});
+function endPtr(e, cancel) {
+  const p = PTR.get(e.pointerId); if (!p) return;
+  PTR.delete(e.pointerId);
+  if (p.kind === 'pad') padStop(p);
+  else if (p.kind === 'key') keyStop(p);
+  else if (p.drag) { fade(FX.dot, 0, 300); settle(); }
+  else coreUp(!cancel);                       // a tap on the core is OK; a cancelled one is nothing
+}
+window.addEventListener('pointerup', e => endPtr(e, false));
+window.addEventListener('pointercancel', e => endPtr(e, true));
+function stopAll() { PTR.forEach(p => { if (p.kind === 'pad') padStop(p); else if (p.kind === 'key') keyStop(p); }); PTR.clear(); fade(FX.dot, 0, 1); fade(FX.cf, 0, 1); settle(); }
+window.addEventListener('blur', stopAll);
+doc.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---- typing: what is added goes as text, what is erased as del, Enter as enter ----
+const TI = $('type-in');
+let typed = '';
+function clearType() { typed = ''; TI.value = ''; }
+TI.addEventListener('input', () => {
+  const v = TI.value.replace(/[\r\n]+/g, ' '), a = Array.from(typed), b = Array.from(v);
+  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  typed = v;
+  for (let del = a.length - i; del > 0; del -= 10) send('del', Math.min(10, del));
+  const add = b.slice(i);
+  for (let s = 0; s < add.length; s += 200) enqueue('text', { text: add.slice(s, s + 200).join('') });
+});
+TI.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  if (e.key === 'Enter') { e.preventDefault(); keyFlash('enter'); send('enter', 1); clearType(); }
+  else if (e.key === 'Backspace' && !TI.value) { keyFlash('del'); send('del', 1); }   // an empty pad still erases on the TV
+});
+$('type').addEventListener('submit', e => e.preventDefault());
+function keyFlash(k) { const el = doc.querySelector(`[data-key="${k}"]`); if (!el) return; el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 140); }
+// a keyboard on the page (a desk Mac, a keyboard on the iPhone): arrows, Enter = OK, Backspace = back
+const KB = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+const KB2 = { Enter: 'select', ' ': 'playpause', Backspace: 'back', Home: 'home', h: 'home', m: 'menu', '+': 'volup', '=': 'volup', '-': 'voldown' };
+doc.addEventListener('keydown', e => {
+  if (e.target === TI || S.sheet || e.metaKey || e.ctrlKey || e.altKey) return;
+  const d = KB[e.key];
+  if (d) { e.preventDefault(); arrow(d, 1, e.repeat ? 'rep' : 'press'); return; }
+  const k = KB2[e.key];
+  if (!k || ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('button'))) return;   // a focused key presses itself
+  e.preventDefault();
+  if (k === 'select') coreUp(true); else { send(k, 1); keyFlash(k); }
+});
+doc.addEventListener('keyup', e => { const d = KB[e.key]; if (d && e.target !== TI) { flareOff(d); settle(); } });
+
+// ---- idle: a minute untouched, the ambient view; ten minutes, the screen dims. The first touch only wakes it ----
+function armIdle() {
+  clearTimeout(S.tIdle); clearTimeout(S.tDim);
+  if (doc.hidden) return;
+  S.tIdle = setTimeout(ambient, CFG.idle);
+  S.tDim = setTimeout(dim, CFG.dim);
+}
+const busy = () => PTR.size > 0 || S.sheet || doc.activeElement === TI || doc.hidden;
+function ambient() {
+  if (S.ambient) return;
+  if (busy()) { armIdle(); return; }
+  S.ambient = true; tick(); body.classList.add('amb');
+  if (MOTION) S.loop = $('a-halo').animate([{ opacity: .5, transform: 'scale(.96)' }, { opacity: 1, transform: 'scale(1.04)' }],
+    { duration: 6500, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+}
+function dim() {
+  if (busy()) { armIdle(); return; }
+  if (!S.ambient) ambient();
+  stopLoop();
+  S.dimmed = true; body.classList.add('dimmed');
+  if (APP && typeof APP.dim === 'function') try { APP.dim(true); } catch (e) { /* the app said no */ }
+}
+function stopLoop() { if (S.loop) { S.loop.cancel(); S.loop = null; } }
+function wake() {
+  const was = S.ambient || S.dimmed;
+  if (S.ambient) { S.ambient = false; body.classList.remove('amb'); }
+  stopLoop();
+  if (S.dimmed) { S.dimmed = false; body.classList.remove('dimmed'); if (APP && typeof APP.dim === 'function') try { APP.dim(false); } catch (e) { /* same */ } }
+  armIdle();
+  return was;
+}
+window.addEventListener('pointerdown', e => {
+  if (S.ambient || S.dimmed) { e.preventDefault(); e.stopImmediatePropagation(); S.swallow.add(e.pointerId); wake(); return; }
+  armIdle();
+}, true);
+for (const t of ['pointermove', 'pointerup', 'pointercancel']) window.addEventListener(t, e => {
+  if (!S.swallow.has(e.pointerId)) return;
+  e.stopImmediatePropagation();
+  if (t !== 'pointermove') { S.swallow.delete(e.pointerId); S.swallowClick = Date.now() + 350; }
+}, true);
+window.addEventListener('click', e => { if (Date.now() < S.swallowClick) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+window.addEventListener('keydown', e => { if (S.ambient || S.dimmed) { e.preventDefault(); e.stopImmediatePropagation(); wake(); return; } armIdle(); }, true);
+doc.addEventListener('input', armIdle, true);
+
+// ---- the clock (24-hour, his tablet's) ----
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const hm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function tick() {
+  const d = new Date();
+  $('clock').textContent = $('a-time').textContent = hm(d);
+  $('a-date').textContent = `${DAYS[d.getDay()]} · ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  clearTimeout(tick.t); tick.t = setTimeout(tick, 60000 - d.getSeconds() * 1000 - d.getMilliseconds() + 30);
+}
+
+// ---- the key sheet (only when the stick says the key is wrong or there is none) ----
+function openSheet() { if (S.sheet) return; S.sheet = true; $('sheet').hidden = false; $('sh-k').value = ''; $('sh-err').textContent = ''; }
+function closeSheet() { $('sheet').hidden = true; S.sheet = false; if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur(); setTimeout(() => layout(true), 300); armIdle(); }
+$('sheet').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('sh-k').value.trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(v)) { $('sh-err').textContent = "That isn't a key: 32 letters and digits."; return; }
+  AUTH.k = v; store.set(KEYNAME, v); S.auth = null; NET.fails = 0; S.now = '';
+  closeSheet(); renderStatus(); renderNow(); connect();
+});
+$('sh-x').addEventListener('click', closeSheet);
+doc.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.sheet) closeSheet(); else if (doc.activeElement === TI) TI.blur(); } });
+$('chip').addEventListener('click', () => { if (S.auth === 'key') openSheet(); else if (NET.state !== 'ok') { NET.fails = 0; connect(); } });
+$('pit-btn').addEventListener('click', openPit);
+function toast(msg, ms) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), ms || 2200);
+}
+
+// ---- in and out of view: nothing runs while hidden, and the stream lets go of its slot on the stick ----
+doc.addEventListener('visibilitychange', () => {
+  if (doc.hidden) { closeStream(); clearTimeout(NET.retryT); stopAll(); stopLoop(); clearTimeout(S.tIdle); clearTimeout(S.tDim); return; }
+  NET.fails = 0; tick(); wake(); connect(); loadApps();
+});
+window.addEventListener('pagehide', closeStream);
+window.addEventListener('pageshow', e => { if (e.persisted) { NET.fails = 0; connect(); } });
+window.addEventListener('online', () => { NET.fails = 0; connect(); });
+window.addEventListener('offline', () => { closeStream(); setNet('offline'); clearTimeout(NET.retryT); NET.retryT = setTimeout(connect, 3000); });
+let rz = 0;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layout, 120); });
+
+// ---- a handle for the tests (and a look from the Mac): reads only ----
+window.remote = {
+  state: () => JSON.parse(JSON.stringify({ net: NET.state, live: NET.live, adb: S.adb, auth: S.auth, front: S.front, v: S.v, ambient: S.ambient, dimmed: S.dimmed,
+    apps: APPS.list.length, queue: NET.q.length, sent: NET.sent, dropped: NET.dropped, geo: S.geo, step: step(), pointers: PTR.size, motion: MOTION, streams: STREAMS, yt: S.yt, ytFull: S.ytFull })),
+  cfg: CFG,
+};
+
+drawReactor(); drawAmbient(); buildFx(); fillIcons(); buildYT();
+doc.querySelectorAll('[data-key]').forEach(bindKey);
+layout(true); tick(); renderStatus(); renderNow(); paintYT();
+if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(() => layout(true));
+connect(); armIdle(); boot();
+})();
+</script>
+</body>
+</html>
