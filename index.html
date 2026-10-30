@@ -377,10 +377,11 @@ body.ctl #keys{display:block;position:absolute;inset:0;z-index:4;pointer-events:
 .kp.down .g,.kp.lit .g{background:radial-gradient(circle,rgba(255,214,140,.5) 0%,rgba(255,181,71,.16) 42%,transparent 68%)}
 .kp.down .r,.kp.lit .r{box-shadow:0 0 0 2px var(--gold-hot),0 0 26px rgba(255,181,71,.7),inset 0 0 18px rgba(255,181,71,.4)}
 .kp.lit .cap{color:var(--gold-hot)}
-.kv{pointer-events:none}
 .kv .i b{font-family:var(--word);font-weight:400;font-size:calc(var(--kp)*.42);line-height:1;color:var(--gold-hot)}
-.kv .cap{color:var(--dim)}
-.kv.mute .i b{color:var(--red)}
+.kv .i svg,.kv.mute .i b{display:none}
+.kv.mute .i svg{display:block}
+.kv.mute{color:var(--red)}
+.kv.mute .r{box-shadow:0 0 0 1.5px var(--red),inset 0 0 14px rgba(255,90,60,.2)}
 .kv.mute .cap{color:var(--red)}
 body.ctl #clock{pointer-events:none}
 #c-on{display:flex;align-items:center;justify-content:center;gap:0;max-width:96%;color:var(--gold-hot);margin-top:calc(var(--R)*.05)}
@@ -537,16 +538,16 @@ function toast(msg, ms) {
 // ---- the services: the app's Setup decides them; a browser gets the defaults ----
 function loadServices() {
   let list = null;
-  if (APP) try { const j = JSON.parse(APP.services()); list = j.services; S.version = j.version; S.tv = !!j.tv; } catch (e) { /* defaults */ }
+  if (APP || CTL && APP0) try { const j = JSON.parse((APP || APP0).services()); list = j.services; S.version = j.version; S.tv = !!j.tv; } catch (e) { /* defaults */ }
   if (CTL) S.tv = true;   // the TV's layout, the TV's pods (the defaults, as on the stick)
   body.classList.toggle('tv', !!S.tv);
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
-    const gone = !s.name && !s.url;   // a slot with no name and no address is not drawn at all
+    const gone = !s.url && (!s.name || CTL && i === 0);   // a slot with no name and no address is not drawn at all; the tablet's Lounge slot stays off the controller
     return { i, gone, name: String(s.name || DEFAULTS[i].name), url: String(s.url || ''), mic: !!s.mic };
   });
   S.pitIx = S.svc.findIndex(s => /\/the-pit(\/|$)/.test(s.url));
-  $('ver').textContent = 'HUB' + (S.version ? ' · APP ' + S.version : '');
+  if (!CTL) $('ver').textContent = 'HUB' + (S.version ? ' · APP ' + S.version : '');
 }
 
 // ---- drawing: the rings once, as SVG; only their layers turn ----
@@ -791,7 +792,8 @@ function launch(i) {
   e.animate([{ transform: `scale(${s0})`, opacity: 0 }, { transform: `scale(${s0 * 1.3})`, opacity: 1, offset: .12 }, { transform: `scale(${s1})`, opacity: 1 }],
     { duration: 380, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   setTimeout(() => {
-    if (CTL) CT.hub({ do: 'open', i }); else if (APP) APP.open(i); else location.assign(s.url);
+    if (APP || CTL && APP0) (APP || APP0).open(i);   // the controller too: a pod opens on the tablet in his hand (his 10-30), never on the TV
+    else if (CTL) CT.hub({ do: 'open', i }); else location.assign(s.url);
   }, 230);
   setTimeout(() => {   // still here (the app said no, or a browser stayed): open the room again
     S.launching = false;
@@ -1554,7 +1556,15 @@ const YT = {
     if (f) f.remove(); YT.setFull(false); YT.k = null; YT.c = null; YT.paint();
     if (pic) TV.ring(doc.querySelector(`#yt-ch .ch[data-k="${was}"]`));   // the picture is gone: the ring goes to the channel that was on
   },
-  setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); },
+  setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); YT.nudge(); },
+  // the tablet's FULL SCREEN and SMALL reach the page through the stick's activity, which pauses and resumes it, and the video
+  // misses the size change: 6 of 6 came back full size behind the tile, "cropped and zoomed in" (10-30). One small change of the
+  // frame once the page is resumed puts the picture right (proven on the zoomed state; called straight in the page, 10 of 10 had been fine)
+  nudge() {
+    clearTimeout(YT.tn);
+    const f = $('yt-scr').querySelector('iframe'); if (!f) return;
+    YT.tn = setTimeout(() => { f.style.width = 'calc(100% - 4px)'; YT.tn = setTimeout(() => { f.style.width = ''; }, 400); }, 700);
+  },
   next(d) {
     const l = LOUNGE.TV, i = l.findIndex(x => x.k === YT.k), was = YT.full;
     YT.pick(l[(i + d + l.length) % l.length].k); YT.setFull(was);
@@ -1774,8 +1784,8 @@ const CT = {
   k: null, lane: null, adb: 'ok', refused: false, link: 'boot', front: null, vol: null, asleep: false, powerAt: 0, stAwake: null, tPow: 0, es: null, tDim: 0, dimmed: false, typed: '',
   // the keys in the rings: a = the angle (0 = right, 90 = down), m = the inner ring's smaller pods
   KEYS: [
-    { k: 'wake', ic: 'power', l: 'ON', a: 205 }, { k: 'sleep', ic: 'moon', l: 'OFF', a: 180 }, { k: 'mute', ic: 'mute', l: 'MUTE', a: 155 },
-    { k: 'volup', ic: 'volup', l: 'VOL +', a: 335, rep: 1 }, { k: 'kv', a: 0 }, { k: 'voldown', ic: 'voldn', l: 'VOL −', a: 25, rep: 1 },
+    { k: 'wake', ic: 'power', l: 'ON', a: 200 }, { k: 'sleep', ic: 'moon', l: 'OFF', a: 160 },
+    { k: 'volup', ic: 'volup', l: 'VOL +', a: 335, rep: 1 }, { k: 'mute', v: 1, l: 'MUTE', a: 0 }, { k: 'voldown', ic: 'voldn', l: 'VOL −', a: 25, rep: 1 },
     { k: 'menu', ic: 'menu', l: 'MENU', a: 52 }, { k: 'home', ic: 'hub', l: 'HUB', a: 90 }, { k: 'back', ic: 'back', l: 'BACK', a: 128 },
     { k: 'forward', ic: 'fwd', l: 'FORWARD', a: 65, m: 1, rep: 1 }, { k: 'playpause', ic: 'play', l: 'PLAY / PAUSE', a: 90, m: 1 }, { k: 'rewind', ic: 'rew', l: 'REWIND', a: 115, m: 1, rep: 1 },
   ],
@@ -1880,10 +1890,9 @@ const CT = {
     const f = CT.front, v = CT.vol;
     $('c-now').textContent = CT.asleep ? 'TV OFF · PRESS ON' : !f ? (CT.link === 'ok' ? '—' : 'LINKING…') : f.hub ? 'THE HUB' : String(f.name || f.pkg || 'TV').toUpperCase();
     $('c-link').classList.toggle('on', CT.link === 'ok');
-    $('kv-n').textContent = !v || v.ok === false ? '—' : v.mute ? '×' : String(v.l);
+    $('kv-n').textContent = !v || v.ok === false ? '—' : String(v.l);
     $('kv-c').textContent = v && v.mute ? 'MUTED' : 'VOL';
     $('kv').classList.toggle('mute', !!(v && v.mute));
-    doc.querySelector('.kp[data-k="mute"]').classList.toggle('lit', !!(v && v.mute));
     const chip = !CT.k ? 'KEY NEEDED · OPEN THE REMOTE ONCE' : CT.link === 'wait' ? 'RECONNECTING' : CT.adb === 'asking' ? 'PRESS OK ON THE TV ONCE' : CT.adb === 'off' && CT.refused ? 'KEYS RETRYING · PRESS AGAIN' : '';   // an idle link is no news (the remote's rule)
     const c = $('c-chip'); c.textContent = chip; c.hidden = !chip;
   },
@@ -1908,8 +1917,8 @@ const CT = {
     };
     const shell = '<span class="g"></span><span class="o"></span><span class="r"></span><span class="fc"></span>';
     const box = doc.createElement('div'); box.id = 'keys'; box.setAttribute('aria-label', 'Remote');
-    box.innerHTML = CT.KEYS.map(d => d.k === 'kv'
-      ? `<div class="kp kv" id="kv" data-k="kv">${shell}<span class="i"><b id="kv-n">—</b></span><b class="cap" id="kv-c">VOL</b></div>`
+    box.innerHTML = CT.KEYS.map(d => d.v   // the volume's number is the mute key too (his 10-30: 2 in 1)
+      ? `<button type="button" class="kp kv" id="kv" data-k="${d.k}" aria-label="Volume. Press to mute">${shell}<span class="i">${ic.mute}<b id="kv-n">—</b></span><b class="cap" id="kv-c">VOL</b></button>`
       : `<button type="button" class="kp${d.m ? ' m' : ''}" data-k="${d.k}"${d.rep ? ' data-rep' : ''} aria-label="${d.l}">${shell}<span class="i">${ic[d.ic]}</span>${d.m ? '' : `<b class="cap">${d.l}</b>`}</button>`).join('');
     body.insertBefore(box, $('top'));
     box.querySelectorAll('button[data-k]').forEach(CT.bindKey);

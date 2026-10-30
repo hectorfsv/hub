@@ -529,6 +529,8 @@ try {
     ok(await page.$eval('#yt', y => !y.classList.contains('full')) && !!(await page.$('#yt-scr iframe')) && await cur('#yt-scr'), 'Back: out of full screen, still playing, the ring on the picture');
     await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
     ok(await page.$eval('#yt', y => !y.classList.contains('full')) && await cur('#yt-scr'), 'Select in full screen leaves it too');
+    ok(await page.waitForFunction(() => /calc/.test(document.querySelector('#yt-scr iframe').style.width), null, { timeout: 2000 }).then(() => true, () => false), 'leaving full screen nudges the frame (the stick\'s video misses the change otherwise: "cropped and zoomed in")');
+    ok(await page.waitForFunction(() => document.querySelector('#yt-scr iframe').style.width === '', null, { timeout: 2000 }).then(() => true, () => false), 'and puts it back');
     await page.keyboard.press('ArrowDown');
     ok(await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on')), 'Down from the picture: the playing channel');
     await page.keyboard.press('ArrowUp');

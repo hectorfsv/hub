@@ -49,7 +49,7 @@ async function open(view, { query = '', app = false, lane = false, at = '/' } = 
       window.HubsApp = {
         dim: on => window.__dim.push(on),
         panel: () => { window.__panel = (window.__panel || 0) + 1; },
-        services: () => JSON.stringify({ services: [{ name: 'Lounge' }, { name: 'The Pit' }, { name: 'Home Assistant' }] }),
+        services: () => JSON.stringify({ version: '2.6', services: [{ name: 'Lounge', url: '', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/' }, { name: 'Home Assistant', url: '' }] }),
         open: i => window.__open.push(i),
       };
       if (lane) {   // the tablet's key lane: press/type answer with the link's state; keyLane() is how the app reports a change
@@ -666,17 +666,25 @@ async function controller(view) {
     ok(await mock.waitFor(() => mock.keys('home') === 1, 1500), 'HUB goes to the stick itself');
     ok(await until(page, () => document.getElementById('c-now').textContent === 'THE HUB', 1500), 'and the clock follows: THE HUB');
     mock.setVol({ l: 0, mute: true });
-    ok(await until(page, () => document.getElementById('kv-n').textContent === '×' && document.getElementById('kv-c').textContent === 'MUTED' && document.querySelector('.kp[data-k="mute"]').classList.contains('lit'), 1500), 'muted on the stick: the volume pod says MUTED, the mute key lit');
+    ok(await until(page, () => document.getElementById('kv-c').textContent === 'MUTED' && document.getElementById('kv').classList.contains('mute') && getComputedStyle(document.querySelector('#kv .i svg')).display !== 'none' && getComputedStyle(document.getElementById('kv-n')).display === 'none', 1500), 'muted on the stick: the volume pod shows the crossed speaker and MUTED');
     mock.setVol({ l: 9, mute: false });
-    ok(await until(page, () => document.getElementById('kv-n').textContent === '9' && !document.querySelector('.kp[data-k="mute"]').classList.contains('lit'), 1500), 'VOL 9');
+    ok(await until(page, () => document.getElementById('kv-n').textContent === '9' && !document.getElementById('kv').classList.contains('mute') && getComputedStyle(document.getElementById('kv-n')).display !== 'none', 1500), 'VOL 9');
+    ok(await page.evaluate(() => document.querySelectorAll('.kp[data-k="mute"]').length === 1 && document.querySelector('.kp[data-k="mute"]').id === 'kv' && document.querySelector('.kp[data-k="mute"]').tagName === 'BUTTON'), 'one mute key: the volume\'s number (2 in 1, his word)');
 
     // the ring's apps and the pods
     let from = mock.calls.length;
     await page.locator('.tapp').nth(1).tap();
     ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/launch' && c.delivered && c.body.pkg === mock.apps[1].pkg), 1500), 'an app in the crown opens on the TV (/api/launch)');
     from = mock.calls.length;
+    ok(await page.evaluate(() => document.querySelectorAll('.pod').length === 2), 'two pods: the Pit and Home Assistant; the tablet\'s empty Lounge slot stays off');
     await page.locator('.pod.pit').tap();
-    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.delivered && c.body.do === 'open' && c.body.i === 1), 1500), 'The Pit\'s pod opens The Pit on the TV (/api/hub open 1)');
+    ok(await until(page, () => window.__open.length === 1 && window.__open[0] === 1, 1500), 'The Pit\'s pod opens The Pit on the tablet (HubsApp.open 1)');
+    await sleep(300);
+    ok(!mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'open'), 'and nothing opens on the TV');
+    await page.evaluate(() => window.hub.returned(1));
+    await sleep(2300);   // launch() keeps its lock until the page has been left for good
+    await page.locator('.pod:not(.pit)').tap();
+    ok(await until(page, () => /NOT SET UP/.test(document.getElementById('toast').textContent), 1500) && await page.evaluate(() => window.__open.length === 1), 'Home Assistant: not set up yet, nothing opens');
 
     // live TV: the channel picker (the Lounge's groups)
     ok(await page.evaluate(() => document.getElementById('c-tv-full').disabled && document.getElementById('c-tv-stop').disabled), 'nothing on: FULL SCREEN and STOP are off');
