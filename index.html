@@ -1206,7 +1206,7 @@ window.hub = {
   demo(kind) { S.demoCook = kind === 'cook'; if (kind === 'cook') { S.cook = demoCook(); S.pit = 'cook'; forge(true); renderPods(); renderCook(); } else if (kind === 'off') { S.cook = null; S.pit = pitSession() ? 'idle' : 'unlinked'; forge(false); renderPods(); } },
 };
 
-Object.assign(window.hub, { appsReady() { APPS.load(); }, tv: { YT, TV, APPS, NEWS } });   // the app built its list of a TV's apps (after the page loaded)
+Object.assign(window.hub, { appsReady() { APPS.load(); }, tv: () => ({ YT, TV, APPS, NEWS }) });   // a function: they are declared further down   // the app built its list of a TV's apps (after the page loaded)
 Object.assign(window.hub, { bead(a) { S.beadAt = a; S.beadKey = null; renderDay(); }, holiday: iso => holiday(new Date(iso)), flare: hourFlare, chime() { audioOn(); chime(); } });
 
 // ---- the Lounge's TV channels and news, copied word for word from projects/lounge/index.html (10-29) so both screens
