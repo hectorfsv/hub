@@ -86,9 +86,11 @@ Only with the app's `tv` (the tablet is untouched): the reactor smaller and to t
 around it** (`.tapp`, the app's own icons from `HubsApp.apps()`, at most 24 degrees apart on the left 240 degrees; Up and
 Down walk the ring, Right leaves it; Select asks the app to `launch` it; the clock's date line names the app the ring is on);
 the pods beyond; a right column: the weather folded to one line and six hours, **a YouTube tile** with the Lounge's 12
-channels copied word for word (`LOUNGE.TV`; Select plays with sound, Select again is full screen, Left/Right in full screen
-change the channel, Back leaves full screen, Back again stops; search is the YouTube app's chip: the Lounge's search goes
-through n8n behind its passphrase, the HUB has none) and **the news**: the Lounge's five free feeds and its ranking copied
+channels copied word for word (`LOUNGE.TV`; a channel is a switch: Select plays it with sound and shows a ■, Select again
+stops it; while one plays, Up from the channels is the picture: Select is full screen, Left/Right in full screen change the
+channel, Select or Back leave it; Back anywhere on the HUB stops the video; the channels are a row that scrolls: Left/Right
+walk it in order and the ring only lands on chips in sight (10-29: it vanished onto chips scrolled away, his "no way to stop
+it"); search is the YouTube app's chip: the Lounge's search goes through n8n behind its passphrase, the HUB has none) and **the news**: the Lounge's five free feeds and its ranking copied
 word for word (`LOUNGE.FEEDS`, `newsRank`: US, then Israel and the Middle East, then Mexico), read by the page every 15
 minutes on screen (0 n8n runs); Select opens a story on top (Back closes it). While a video plays the room holds still and
 the sparks step out; no night dimming on a TV; the clock's power bracket goes and its air reading and timer countdown are
@@ -97,7 +99,7 @@ an HTML line under the date (the stick misdraws the core's SVG text).
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 218 checks (the TV view, the remote and the TV layout since 10-29):
+It has 229 checks (the TV view, the remote and the TV layout since 10-29):
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;

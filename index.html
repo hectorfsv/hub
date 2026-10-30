@@ -184,6 +184,9 @@ body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 #yt-ch{display:flex;gap:8px;margin-top:5px;padding:4px;overflow:hidden}
 .ch{flex:none;padding:7px 11px;border-radius:6px;border:1px solid rgba(255,181,71,.28);background:none;font:500 10.5px var(--mono);letter-spacing:.14em;color:var(--dim);white-space:nowrap}
 .ch.on{color:var(--gold-hot);border-color:var(--gold)}
+.ch.on::before{content:'■ '}
+body.tv #yt-scr.cur{outline:2px solid var(--gold-hot);outline-offset:3px}
+#yt-scr.cur::after{content:'SELECT: FULL SCREEN · BACK: STOP';position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;padding:5px 10px;border-radius:5px;background:rgba(11,7,5,.84);font:500 10px var(--mono);letter-spacing:.18em;color:var(--gold-hot);white-space:nowrap;pointer-events:none}
 #news{flex:1;min-height:0;display:flex;flex-direction:column}
 .nh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 .nh b{font-family:var(--word);font-weight:400;font-size:20px;letter-spacing:.16em;color:var(--gold)}
@@ -195,7 +198,8 @@ body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 .nw[hidden]{display:none}
 .nw.cur{background:rgba(255,181,71,.08)}
 body.tv #yt.full{position:fixed;inset:0;z-index:80;background:#000}
-body.tv #yt.full #yt-scr{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}
+body.tv #yt.full #yt-scr{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0;outline:none}
+#yt.full #yt-scr::after{display:none}
 body.tv #yt.full #yt-ch{display:none}
 body.yt-full #reactor,body.yt-full #pods,body.yt-full #apps,body.yt-full #orbit,body.yt-full #motes,body.yt-full #embers,body.yt-full #top,body.yt-full .label{visibility:hidden}
 /* a video in the tile or full screen: the room holds still (measured 10-29: FOX in the tile beside the moving HUB = 47 doubled
@@ -1347,16 +1351,22 @@ const YT = {
   },
   playing() { return !!$('yt-scr').querySelector('iframe'); },
   pick(k) {
-    if (YT.k === k && YT.playing()) { YT.setFull(!YT.full); return; }
+    if (YT.k === k && YT.playing()) { YT.stop(); return; }   // a channel is a switch: Select again stops it (his 10-29: "no way to stop it")
     const c = LOUNGE.TV.find(x => x.k === k); if (!c) return;
+    const pic = TV.cur === $('yt-scr');
     YT.stop();
     const f = doc.createElement('iframe'); f.title = c.name;
     f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     f.referrerPolicy = 'strict-origin-when-cross-origin';   // YouTube refuses embeds that do not say which site they are on (the Lounge's lesson)
     f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), 'https://www.youtube.com'); } catch (e) { /* not ready */ } });
     f.src = YT.src(c); $('yt-scr').appendChild(f); YT.k = k; YT.paint();
+    if (pic) TV.ring($('yt-scr'));                             // a channel changed from the picture: the ring stays on it
   },
-  stop() { const f = $('yt-scr').querySelector('iframe'); if (f) f.remove(); YT.setFull(false); YT.k = null; YT.paint(); },
+  stop() {
+    const f = $('yt-scr').querySelector('iframe'), was = YT.k, pic = TV.cur === $('yt-scr');
+    if (f) f.remove(); YT.setFull(false); YT.k = null; YT.paint();
+    if (pic) TV.ring(doc.querySelector(`#yt-ch .ch[data-k="${was}"]`));   // the picture is gone: the ring goes to the channel that was on
+  },
   setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); },
   next(d) {
     const l = LOUNGE.TV, i = l.findIndex(x => x.k === YT.k), was = YT.full;
@@ -1368,7 +1378,7 @@ const YT = {
     doc.querySelectorAll('#yt-ch .ch').forEach(b => b.classList.toggle('on', b.dataset.k === YT.k));
     $('yt-idle').hidden = YT.playing();
     $('yt-name').textContent = c ? c.short.toUpperCase() : 'YOUTUBE';
-    $('yt-hint').textContent = hint || 'PICK A CHANNEL BELOW · SELECT AGAIN FOR FULL SCREEN';
+    $('yt-hint').textContent = hint || 'PICK A CHANNEL BELOW · SELECT IT AGAIN TO STOP';
   },
 };
 window.addEventListener('message', e => {   // the player says when a stream has ended (a channel's video id goes stale: the Lounge's 09-17 lesson)
@@ -1421,7 +1431,9 @@ doc.addEventListener('visibilitychange', () => { if (!doc.hidden) fitNews(); });
 // ---- a remote (the Fire TV Stick, 10-29): the arrows move a gold ring by direction, Select presses, the clock is the timer ----
 // The app says `tv` in its services and hands the stick's arrows and Select to this page as ArrowLeft/Right/Up/Down and Enter.
 // The ring walks the apps (Up/Down along their ring), the clock, the pods, the link chip, the YouTube channels, the news and the
-// gear; inside a sheet, that sheet's buttons and fields. YouTube full screen: Left/Right change the channel, Back leaves it.
+// gear; inside a sheet, that sheet's buttons and fields. The channels are a row that scrolls: the ring lands only on the ones
+// in sight, and Left/Right walk it. While one plays, Up is the picture: Select is full screen, Back stops it.
+// YouTube full screen: Left/Right change the channel, Select or Back leave it.
 const TV = {
   cur: null, back: null,
   targets() {
@@ -1429,8 +1441,10 @@ const TV = {
     if (S.sheet) return [...$('sheet').querySelectorAll('button:not([disabled]),input')].filter(shown);
     const nl = $('news-l').getBoundingClientRect();
     const rows = [...doc.querySelectorAll('.nw')].filter(e => !e.hidden && e.getBoundingClientRect().bottom <= nl.bottom + 1);   // only rows that fit
+    const cb = $('yt-ch').getBoundingClientRect();   // the row scrolls: a chip scrolled out of sight is no target (10-29: the ring vanished onto one)
+    const chips = [...doc.querySelectorAll('#yt-ch .ch')].filter(e => { const r = e.getBoundingClientRect(); return r.left >= cb.left - 1 && r.right <= cb.right + 1; });
     return [...doc.querySelectorAll('.tapp'), ...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'),
-      ...doc.querySelectorAll('#yt-ch .ch'), ...rows, $('gear')].filter(shown);
+      YT.playing() ? $('yt-scr') : null, ...chips, ...rows, $('gear')].filter(shown);
   },
   ring(el) {
     if (TV.cur) TV.cur.classList.remove('cur');
@@ -1454,6 +1468,13 @@ const TV = {
       if (dy) { const n = apps[i + (dy > 0 ? 1 : -1)]; if (n) TV.ring(n); return; }
       if (dx < 0) return;
     }
+    if (TV.cur.classList.contains('ch') && dx) {   // the channels: Left/Right walk the row in order and it scrolls; the first one's Left leaves it
+      const row = [...doc.querySelectorAll('#yt-ch .ch')], n = row[row.indexOf(TV.cur) + dx];
+      if (n) { TV.ring(n); return; }
+      if (dx > 0) return;
+    }
+    if (TV.cur.classList.contains('ch') && dy < 0 && YT.playing()) { TV.ring($('yt-scr')); return; }   // the picture is big: by its middle it loses to the link chip
+    if (TV.cur === $('yt-scr') && dy > 0) { TV.ring(doc.querySelector('#yt-ch .ch.on') || doc.querySelector('#yt-ch .ch')); return; }
     const fromApp = TV.cur.classList.contains('tapp');
     const c = TV.mid(TV.cur); let best = null, score = Infinity;
     for (const e of t) {
@@ -1469,7 +1490,7 @@ const TV = {
     const t = TV.targets(), e = TV.cur;
     if (!e || !t.includes(e)) { TV.settle(0); return; }
     if (!S.sheet) TV.back = e;                                // where to return when a sheet closes
-    if (e === $('clock')) openTimer(); else if (e.tagName === 'INPUT') { e.focus(); return; } else e.click();
+    if (e === $('clock')) openTimer(); else if (e === $('yt-scr')) { YT.setFull(true); return; } else if (e.tagName === 'INPUT') { e.focus(); return; } else e.click();
     TV.settle(80);
   },
   /** After a press or Back: a sheet may have opened or closed; the ring lands on the right thing. */
@@ -1486,9 +1507,9 @@ const TV = {
 doc.addEventListener('keydown', e => {   // capture: it sees a sheet before the sheet's own Escape closes it
   if (!S.tv) return;
   const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-  if (YT.full) {                                              // full screen: Left/Right change the channel, Back leaves, the rest waits
-    if (e.key === 'Escape') { YT.setFull(false); const c = doc.querySelector(`#yt-ch .ch[data-k="${YT.k}"]`); if (c) TV.ring(c); return; }
+  if (YT.full) {                                              // full screen: Left/Right change the channel, Select or Back leave, the rest waits
     e.preventDefault();
+    if (e.key === 'Escape' || e.key === 'Enter') { YT.setFull(false); TV.ring($('yt-scr')); return; }
     if (d && d[0]) YT.next(d[0]);
     return;
   }
