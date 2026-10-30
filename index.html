@@ -325,6 +325,47 @@ body.dim #scan,body.dim #motes{display:none}
 #sheet .err{color:#FF8A80;min-height:20px}
 #toast{position:fixed;left:50%;top:18px;z-index:70;transform:translate(-50%,-220%);opacity:0;padding:11px 18px;border-radius:6px;background:rgba(20,13,9,.96);border:1px solid rgba(255,181,71,.5);font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--gold-hot);white-space:nowrap;transition:transform .35s cubic-bezier(.2,.9,.3,1),opacity .25s;pointer-events:none}
 #toast.on{transform:translate(-50%,0);opacity:1}
+/* ---- the controller (?ctl, the tablet, 10-30): the TV's HUB above, a remote's keys below; every touch acts on the TV ---- */
+#ctl{display:none}
+body.ctl{--bar:96px}
+body.ctl.tv.land #bottom{bottom:calc(var(--bar) + 4px)}
+body.ctl #corners{bottom:calc(var(--bar) + 2px)}
+body.ctl #ctl{display:flex;position:fixed;left:0;right:0;bottom:0;height:var(--bar);z-index:25;align-items:stretch;gap:14px;padding:6px 22px 14px;
+  background:linear-gradient(180deg,rgba(10,7,8,0),rgba(10,7,8,.94) 26%)}
+#ctl .cg{display:flex;flex:none;border-radius:16px;background:linear-gradient(180deg,#1F150E 0%,#110A07 100%);
+  box-shadow:0 0 0 1px rgba(255,181,71,.36),inset 0 1px 0 rgba(255,233,176,.1),0 8px 24px rgba(0,0,0,.5)}
+#ctl .ck{position:relative;min-width:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:0 6px;border:0;background:none;
+  color:var(--gold-hot);border-radius:16px;touch-action:none;transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+#ctl .ck svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+#ctl .ck svg .f{fill:currentColor;fill-opacity:.2}
+#ctl .ck small{font:500 10px var(--mono);letter-spacing:.2em;padding-left:.2em;color:var(--dim)}
+#ctl .ck::after{content:'';position:absolute;inset:3px;border-radius:13px;opacity:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,rgba(255,214,140,.45) 0%,rgba(255,181,71,.15) 55%,transparent 80%);transition:opacity .28s ease}
+#ctl .ck.down{transform:scale(.92);transition-duration:.05s}
+#ctl .ck.down::after{opacity:1;transition-duration:.04s}
+#ctl .ck.lit::after,body.asleep #ctl [data-k=wake]::after{opacity:.6}
+#ctl .ck.lit small,body.asleep #ctl [data-k=wake] small{color:var(--gold-hot)}
+#c-vol{align-self:center;min-width:78px;text-align:center;font:500 12px var(--mono);letter-spacing:.16em;color:var(--gold-hot)}
+#c-mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 6px}
+#c-mid small{font:500 10px var(--mono);letter-spacing:.24em;color:var(--dim)}
+#c-mid small i{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:var(--faint);vertical-align:1px}
+#c-mid small i.on{background:var(--go);box-shadow:0 0 8px var(--go)}
+#c-now{font:400 30px/1 var(--word);letter-spacing:.06em;color:var(--gold-hot);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#c-chip{font:500 10px var(--mono);font-style:normal;letter-spacing:.16em;color:var(--gold)}
+#c-chip[hidden]{display:none}
+.c-fx{position:fixed;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;pointer-events:none;z-index:24;
+  background:radial-gradient(circle,rgba(255,214,140,.55) 0%,rgba(255,181,71,.18) 55%,transparent 72%)}
+body.ctl #reactor{touch-action:none}
+body.ctl #yt-scr{cursor:pointer}
+body.asleep #reactor,body.asleep #pods,body.asleep .label,body.asleep #apps,body.asleep #bottom,body.asleep #ctl .cg:not(:first-child),body.asleep #ctl [data-k=sleep]{opacity:.28}
+#c-typer{position:fixed;left:50%;top:18px;z-index:62;transform:translateX(-50%);display:flex;gap:10px;padding:12px;border-radius:16px;background:rgba(14,9,7,.97);
+  box-shadow:0 0 0 1px rgba(255,181,71,.45),0 18px 60px rgba(0,0,0,.8)}
+#c-typer[hidden]{display:none}
+#c-typer input{width:560px;height:60px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,181,71,.35);background:#140D0A;color:var(--ink);font:500 22px var(--disp);
+  user-select:text;-webkit-user-select:text}
+#c-typer input:focus{outline:none;border-color:var(--gold)}
+#c-typer button{min-width:100px;height:60px;border-radius:10px;border:1px solid rgba(255,181,71,.5);background:#1C130D;color:var(--ink);font:600 15px var(--disp);letter-spacing:.16em}
+#c-typer button.go{background:var(--gold);border-color:var(--gold);color:#140C06}
 /* a browser asking for less motion gets a still reactor. Not the tablet's app: its "reduce motion" is only Android's
    own animations switched off for speed (10-28), and the HUB's motion is the point (Hector: "make it look the best possible") */
 @media (prefers-reduced-motion:reduce){body:not(.app) .spin,body:not(.app) .halo,body:not(.app) .pulse,body:not(.app) .pod .orb,body:not(.app) .pod .glow{animation:none!important}}
@@ -366,8 +407,13 @@ body.dim #scan,body.dim #motes{display:none}
 <script>
 (() => {
 'use strict';
-const APP = window.HubsApp || null;          // the Hubs app on the desk tablet; absent in a browser
 const Q = new URLSearchParams(location.search);
+// ?ctl: the tablet as the TV's controller (10-30): this HUB drawn as the TV draws it, every touch sent to the stick (section
+// "the controller"). The tablet's own app is then only the key lane and the panel, never the host of these pods and apps.
+const CTL = Q.has('ctl'), CTL_BAR = 96;
+const APP0 = window.HubsApp || null;
+const APP = CTL ? null : APP0;               // the Hubs app on the desk tablet (or the stick); absent in a browser
+if (CTL) { const m = document.querySelector('meta[name=viewport]'); if (m) m.content = 'width=1443'; }   // the TV's own width (the stick's TV_VIEWPORT)
 const DEMO = Q.get('demo') || '';
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const MIN = 60e3;
@@ -399,6 +445,7 @@ function toast(msg, ms) {
 function loadServices() {
   let list = null;
   if (APP) try { const j = JSON.parse(APP.services()); list = j.services; S.version = j.version; S.tv = !!j.tv; } catch (e) { /* defaults */ }
+  if (CTL) S.tv = true;   // the TV's layout, the TV's pods (the defaults, as on the stick)
   body.classList.toggle('tv', !!S.tv);
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
@@ -463,7 +510,7 @@ function wxLabel(c) {
 
 // ---- layout: portrait (the tablet), landscape, any phone or desktop ----
 function layout(force) {
-  const W = innerWidth, H = innerHeight;
+  const W = innerWidth, H = innerHeight - (CTL ? CTL_BAR : 0);   // the controller's key bar sits below the HUB
   if (S.sheet && !force && S.geo && S.geo.W === W) return;   // the keyboard is up for the sheet: keep everything still
   const land = W > H * 1.1;
   body.classList.toggle('land', land);
@@ -634,7 +681,7 @@ function launch(i) {
   e.animate([{ transform: `scale(${s0})`, opacity: 0 }, { transform: `scale(${s0 * 1.3})`, opacity: 1, offset: .12 }, { transform: `scale(${s1})`, opacity: 1 }],
     { duration: 380, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   setTimeout(() => {
-    if (APP) APP.open(i); else location.assign(s.url);
+    if (CTL) CT.hub({ do: 'open', i }); else if (APP) APP.open(i); else location.assign(s.url);
   }, 230);
   setTimeout(() => {   // still here (the app said no, or a browser stayed): open the room again
     S.launching = false;
@@ -961,7 +1008,7 @@ window.addEventListener('offline', () => { $('net').textContent = 'OFFLINE'; $('
 let rz = 0;
 window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const w = S.geo && S.geo.W; layout(); if (S.geo.W !== w) { motes(); if (body.classList.contains('forge')) { body.classList.remove('forge'); forge(true); } } }, 120); });
 
-$('gear').addEventListener('click', () => { if (APP) APP.panel(); });
+$('gear').addEventListener('click', () => { if (APP0) APP0.panel(); });   // the controller too: the tablet's own panel
 doc.addEventListener('keydown', e => { if (e.key === 'Escape' && S.sheet) closeSheet(); });
 
 // ---- samples (?demo=cook, ?demo=night): never real data ----
@@ -1001,7 +1048,7 @@ function addOns() {
   S.tmr = store.get('hub.timer');
   if (S.tmr && (S.tmr.done || S.tmr.end < Date.now() - 120e3)) { S.tmr = null; store.del('hub.timer'); }
   renderTimer();
-  press($('clock'), () => {}, openTimer);   // hold the clock: the kitchen timer
+  if (!CTL) press($('clock'), () => {}, openTimer);   // hold the clock: the kitchen timer (on the controller the clock is the arrows)
   doc.addEventListener('pointerdown', e => {   // a finished timer: the first touch stops it, and does nothing else
     if (!S.tmr || !S.tmr.done) return;
     stopTimer(); S.swallow = Date.now() + 650; e.stopPropagation();
@@ -1320,22 +1367,24 @@ const LOUNGE = (() => {
 // ---- a TV's apps: the ring around the clock. The app lists them (its own icons) and launches them; Back in an app returns here ----
 const APPS = {
   list: [],
-  load() {
-    if (!S.tv || !APP || !APP.apps) return;
-    let l = []; try { l = JSON.parse(APP.apps()); } catch (e) { l = []; }
+  load(given) {   // given: the controller's list, from the stick
+    if (!S.tv) return;
+    let l = given;
+    if (!l) { if (!APP || !APP.apps) return; try { l = JSON.parse(APP.apps()); } catch (e) { l = []; } }
     APPS.list = Array.isArray(l) ? l.filter(a => a && typeof a.pkg === 'string' && typeof a.name === 'string').slice(0, 16) : [];
     const box = $('apps'); box.innerHTML = '';
     APPS.list.forEach(a => {
       const d = doc.createElement('div'); d.className = 'tapp'; d.setAttribute('role', 'button'); d.setAttribute('aria-label', a.name);
       d.dataset.pkg = a.pkg; d.dataset.name = a.name;
       if (/^data:image\/png;base64,/.test(a.icon || '')) { const im = doc.createElement('img'); im.alt = ''; im.src = a.icon; d.appendChild(im); }
-      d.addEventListener('click', () => { if (APP && APP.launch) APP.launch(a.pkg); });
+      d.addEventListener('click', () => launchApp(a.pkg));
       box.appendChild(d);
     });
     placeApps();
-    if (!TV.cur || !TV.targets().includes(TV.cur)) TV.home();
+    if (!CTL && (!TV.cur || !TV.targets().includes(TV.cur))) TV.home();
   },
 };
+function launchApp(pkg) { if (CTL) CT.launch(pkg); else if (APP && APP.launch) APP.launch(pkg); }
 // on the left of the clock, top to bottom, at most 24 degrees apart (240 at most, clear of the pods on the right)
 function placeApps() {
   const g = S.geo, els = [...$('apps').children];
@@ -1358,7 +1407,7 @@ const YT = {
       b.addEventListener('click', () => YT.pick(c.k)); box.appendChild(b);
     });
     const y = doc.createElement('button'); y.type = 'button'; y.className = 'ch'; y.dataset.k = 'app'; y.textContent = 'YOUTUBE APP ▸';
-    y.addEventListener('click', () => { YT.stop(); if (APP && APP.launch) APP.launch('com.amazon.firetv.youtube'); }); box.appendChild(y);
+    y.addEventListener('click', () => { YT.stop(); launchApp('com.amazon.firetv.youtube'); }); box.appendChild(y);
     YT.paint();
   },
   src(c) {
@@ -1538,11 +1587,280 @@ window.addEventListener('blur', () => setTimeout(() => {
   const a = doc.activeElement; if (S.tv && a && a.tagName === 'IFRAME') { a.blur(); window.focus(); }
 }, 0));
 
+// ---- the controller (10-30, his ask: "keep the same view on controller and HUB, just the controller make it just be a
+// controller ... keep it animated since the HUB is the one playing"): the tablet draws this HUB as the TV does (the stick
+// serves it at /hub?ctl, the remote's own address, so the remote's API and key are this page's too) and every touch acts
+// on the TV. The clock is the arrows and OK: a side of it is that arrow (hold to repeat), the middle is OK, a swipe walks
+// one arrow per step. An app on the ring opens on the TV, a pod opens that hub there, a channel plays on the TV's tile
+// (the same one again stops it; a tap on the tile is full screen). The bar below is the rest of a remote. Keys go through
+// the tablet app's own adb link (HubsApp.press) when it has one; HUB is always the stick's own (it brings the HUB, from any
+// app). While the TV sleeps only ON goes out (his word 10-30).
+const CT = {
+  k: null, lane: null, adb: 'ok', refused: false, link: 'boot', front: null, vol: null, asleep: false, powerAt: 0, stAwake: null, tPow: 0, es: null, tDim: 0, dimmed: false, typed: '',
+  start() {
+    try {
+      const u = new URL(location.href), k = u.searchParams.get('k');
+      if (k !== null) {   // the key leaves the address (as on the remote) and is kept where the remote keeps it
+        u.searchParams.delete('k'); history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+        if (/^[A-Za-z0-9_-]{8,128}$/.test(k)) { CT.k = k; try { localStorage.setItem('hubs.remote.k', k); } catch (e) { /* this visit only */ } }
+      }
+    } catch (e) { /* no URL API */ }
+    if (!CT.k) try { CT.k = localStorage.getItem('hubs.remote.k'); } catch (e) { CT.k = null; }
+    CT.lane = APP0 && typeof APP0.press === 'function' && APP0.keyState() !== 'none' ? APP0 : null;
+    window.keyLane = a => { if (CT.lane) { CT.adb = a; if (a === 'ok') CT.refused = false; CT.status(); } };   // the app: its link to the stick changed
+    $('ver').textContent = 'HUB · CONTROLLER';
+    CT.bar(); CT.pad(); CT.yt();
+    doc.addEventListener('click', e => { if (e.target.closest && e.target.closest('.nw')) e.preventDefault(); }, true);   // a story is the TV's, never this page's
+    doc.addEventListener('pointerdown', CT.wake, true);
+    CT.connect(); CT.apps(); CT.wake(); CT.status();
+  },
+
+  // ---- to the stick ----
+  call(path, body) {
+    const post = body !== undefined;
+    return fetchT(path, 5000, { method: post ? 'POST' : 'GET', cache: 'no-store', body: post ? JSON.stringify(body) : undefined,
+      headers: Object.assign({ 'X-Hubs-Key': CT.k || '' }, post ? { 'Content-Type': 'application/json' } : {}) });
+  },
+  async post(path, body) {
+    try {
+      const r = await CT.call(path, body);
+      if (r.ok) return true;
+      let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
+      if (r.status === 409 && j && j.error === 'asleep') { CT.power(false, true); toast('THE TV IS OFF · PRESS ON'); }
+      else if (r.status === 401) toast('THE STICK WANTS ITS KEY · OPEN THE REMOTE ONCE');
+      else if (r.status === 503 && j && j.error === 'adb') { CT.adb = j.adb; CT.status(); toast(j.adb === 'asking' ? 'PRESS OK ON THE TV ONCE' : 'KEYS RETRYING · PRESS AGAIN'); }
+      else if (r.status === 404 && path === '/api/launch') toast("THAT APP ISN'T ON THE TV");
+      else toast('THE STICK SAID ' + r.status);
+    } catch (e) { toast('THE STICK DID NOT ANSWER'); }
+    return false;
+  },
+  gate(k) { if (CT.asleep && k !== 'wake') { toast('THE TV IS OFF · PRESS ON'); return false; } return true; },
+  send(k, n) {
+    if (!CT.gate(k)) return false;
+    if (CT.lane && k !== 'home') {   // the lane has no Home: HUB is the stick's
+      const got = CT.lane.press(k, n || 1);
+      if (got !== 'ok') { CT.adb = got; CT.refused = true; CT.status(); toast(got === 'asking' ? 'PRESS OK ON THE TV ONCE' : 'KEYS RETRYING · PRESS AGAIN'); return false; }
+      if (CT.adb !== 'ok' || CT.refused) { CT.adb = 'ok'; CT.refused = false; CT.status(); }
+    } else CT.post('/api/key', { k, n: n || 1 });
+    if (k === 'sleep' || k === 'wake') CT.power(k === 'wake', true);
+    return true;
+  },
+  text(t) {
+    if (!CT.gate('text')) return;
+    if (!CT.lane) { CT.post('/api/text', { text: t }); return; }
+    const got = CT.lane.type(t);
+    if (got !== 'ok') { CT.adb = got; CT.refused = true; CT.status(); toast(got === 'asking' ? 'PRESS OK ON THE TV ONCE' : 'KEYS RETRYING · PRESS AGAIN'); }
+  },
+  hub(b) { if (!CT.gate('hub')) return false; CT.post('/api/hub', b); return true; },
+  launch(pkg) { if (CT.gate('launch')) CT.post('/api/launch', { pkg }); },
+  async apps() {   // the ring: the stick's own apps and icons
+    if (!CT.k) return;
+    try {
+      const r = await CT.call('/api/apps'); if (!r.ok) throw new Error(r.status);
+      const l = await r.json(); APPS.load(Array.isArray(l) ? l : []);
+    } catch (e) { setTimeout(CT.apps, 15000); }
+  },
+
+  // ---- from the stick: what is on the TV, awake or asleep, the volume (the remote's own event stream) ----
+  connect() {
+    if (CT.es) CT.es.close();
+    if (!CT.k || typeof EventSource !== 'function') { CT.link = 'off'; CT.status(); return; }
+    const es = new EventSource('/api/events?k=' + encodeURIComponent(CT.k)); CT.es = es;
+    es.onopen = () => { CT.link = 'ok'; CT.status(); };
+    es.addEventListener('state', e => { try { CT.state(JSON.parse(e.data)); } catch (x) { /* a torn event */ } });
+    es.onerror = () => { CT.link = 'wait'; CT.status(); };   // EventSource asks again by itself
+  },
+  state(st) {
+    if (!st || typeof st !== 'object') return;
+    const was = CT.front;
+    CT.front = st.front && typeof st.front === 'object' ? st.front : null;
+    CT.adb = CT.lane ? CT.lane.keyState() : typeof st.adb === 'string' ? st.adb : CT.adb;
+    if (typeof st.awake === 'boolean') { CT.stAwake = st.awake; CT.syncPower(); }
+    CT.vol = st.vol && typeof st.vol === 'object' ? st.vol : null;
+    if (typeof st.v === 'string' && st.v) $('ver').textContent = 'HUB · CONTROLLER · STICK ' + st.v;
+    if (CT.front && !CT.front.hub && (!was || was.hub) && YT.k) { YT.k = null; YT.full = false; YT.paint(); }   // the HUB left the TV: its video is off
+    CT.status();
+  },
+  syncPower() {   // the stick's word, once a press of ON/OFF here is 3 s old (a state sent before the press arrives late)
+    clearTimeout(CT.tPow);
+    const w = 3000 - (Date.now() - CT.powerAt);
+    if (w > 0) { CT.tPow = setTimeout(CT.syncPower, w); return; }
+    if (typeof CT.stAwake === 'boolean') CT.power(CT.stAwake, false);
+  },
+  power(awake, mine) {
+    if (mine) { CT.powerAt = Date.now(); CT.syncPower(); }
+    if (CT.asleep === !awake) return;
+    CT.asleep = !awake; body.classList.toggle('asleep', CT.asleep); CT.status();
+  },
+  status() {
+    const f = CT.front, v = CT.vol;
+    $('c-now').textContent = CT.asleep ? 'TV OFF · PRESS ON' : !f ? (CT.link === 'ok' ? '—' : 'LINKING…') : f.hub ? 'THE HUB' : String(f.name || f.pkg || 'TV').toUpperCase();
+    $('c-vol').textContent = !v || v.ok === false ? 'VOL' : v.mute ? 'MUTED' : 'VOL ' + v.l;
+    $('c-mute').classList.toggle('lit', !!(v && v.mute));
+    const chip = !CT.k ? 'KEY NEEDED · OPEN THE REMOTE ONCE' : CT.link === 'wait' ? 'RECONNECTING' : CT.adb === 'asking' ? 'PRESS OK ON THE TV ONCE' : CT.adb === 'off' && CT.refused ? 'KEYS RETRYING · PRESS AGAIN' : '';   // an idle link is no news (the remote's rule)
+    const c = $('c-chip'); c.textContent = chip; c.hidden = !chip;
+    $('c-link').classList.toggle('on', CT.link === 'ok');
+  },
+
+  // ---- the bar: the rest of a remote, in the remote's own keys ----
+  bar() {
+    const SV = b => `<svg viewBox="0 0 48 48" aria-hidden="true">${b}</svg>`, SPK = '<path class="f" d="M7 19h6l8.5-7v24L13 29H7z"/>';
+    const ic = {
+      power: SV('<path d="M24 7v15"/><path d="M15.2 12.8a14 14 0 1 0 17.6 0"/>'),
+      moon: SV('<path class="f" d="M34 31A13.5 13.5 0 0 1 18.5 11.5a14 14 0 1 0 15.5 19.5z"/>'),
+      back: SV('<path d="M19 12 8 23l11 11"/><path d="M9 23h19.5c6.4 0 11 4.4 11 10s-4.6 10-11 10H23"/>'),
+      hub: SV('<circle cx="24" cy="24" r="14.5"/><circle class="f" cx="24" cy="24" r="6.5"/><path d="M24 4.5v5M24 38.5v5M4.5 24h5M38.5 24h5"/>'),
+      menu: SV('<path d="M12 15h24M12 24h24M12 33h24"/>'),
+      rew: SV('<path class="f" d="M22 14 9 24l13 10z"/><path class="f" d="M38 14 25 24l13 10z"/>'),
+      play: SV('<path class="f" d="M9 13v22l15-11z"/><path d="M31 14v20M39 14v20"/>'),
+      fwd: SV('<path class="f" d="M10 14l13 10-13 10z"/><path class="f" d="M26 14l13 10-13 10z"/>'),
+      search: SV('<circle cx="21" cy="21" r="10.5"/><path d="M29 29l10 10"/>'),
+      kb: SV('<rect x="5" y="13" width="38" height="22" rx="4"/><path d="M11 20h2M17 20h2M23 20h2M29 20h2M35 20h2M15 28h18"/>'),
+      mute: SV(SPK + '<path d="M30 19l10 10M40 19 30 29"/>'),
+      voldn: SV(SPK + '<path d="M29 24h11"/>'),
+      volup: SV(SPK + '<path d="M29 24h11M34.5 18.5v11"/>'),
+    };
+    const k = (key, icon, label, rep, id) => `<button type="button" class="ck" data-k="${key}"${rep ? ' data-rep' : ''}${id ? ` id="${id}"` : ''} aria-label="${label}">${ic[icon]}<small>${label}</small></button>`;
+    const nav = doc.createElement('nav'); nav.id = 'ctl'; nav.setAttribute('aria-label', 'Remote');
+    nav.innerHTML = `<div class="cg">${k('wake', 'power', 'ON')}${k('sleep', 'moon', 'OFF')}</div>`
+      + `<div class="cg">${k('back', 'back', 'BACK')}${k('home', 'hub', 'HUB')}${k('menu', 'menu', 'MENU')}</div>`
+      + `<div class="cg">${k('rewind', 'rew', 'REW', 1)}${k('playpause', 'play', 'PLAY')}${k('forward', 'fwd', 'FWD', 1)}</div>`
+      + `<div class="cg">${k('search', 'search', 'SEARCH')}<button type="button" class="ck" id="c-type" aria-label="Type on the TV">${ic.kb}<small>TYPE</small></button></div>`
+      + `<div id="c-mid"><small><i id="c-link"></i>NOW ON TV</small><b id="c-now">LINKING…</b><em id="c-chip" hidden></em></div>`
+      + `<div class="cg">${k('mute', 'mute', 'MUTE', 0, 'c-mute')}${k('voldown', 'voldn', 'VOL −', 1)}<span id="c-vol">VOL</span>${k('volup', 'volup', 'VOL +', 1)}</div>`;
+    body.appendChild(nav);
+    nav.querySelectorAll('[data-k]').forEach(CT.bindKey);
+    $('c-type').addEventListener('click', CT.openType);
+  },
+  bindKey(el) {   // pressed on the touch itself; the hold-to-repeat ones repeat (500 ms, then faster), as on the remote
+    const k = el.dataset.k, rep = el.hasAttribute('data-rep');
+    let t = 0, live = false, n = 0;
+    const stop = () => { live = false; clearTimeout(t); el.classList.remove('down'); };
+    el.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
+      live = true; n = 0; el.classList.add('down');
+      if (!CT.send(k, 1)) { stop(); return; }
+      if (rep) t = setTimeout(function again() {
+        if (!live) return;
+        n++; if (!CT.send(k, 1)) { stop(); return; }
+        t = setTimeout(again, Math.max(80, Math.round(180 * Math.pow(.86, n - 1))));
+      }, 500);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, stop));
+  },
+
+  // ---- the clock is the arrows and OK ----
+  pad() {
+    const r = $('reactor'), STEP = 64;   // a swipe: one arrow per 64 px along its way
+    const P = { id: null, x: 0, y: 0, ax: 0, ay: 0, zone: null, moved: false, n: 0, t: 0 };
+    const zone = (x, y) => {
+      const b = r.getBoundingClientRect(), dx = x - (b.left + b.width / 2), dy = y - (b.top + b.height / 2);
+      if (Math.hypot(dx, dy) < b.width / 2 * .5) return 'select';
+      return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    };
+    r.addEventListener('pointerdown', e => {
+      if (e.button > 0 || P.id !== null) return;
+      e.preventDefault();
+      try { r.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
+      Object.assign(P, { id: e.pointerId, x: e.clientX, y: e.clientY, ax: 0, ay: 0, zone: zone(e.clientX, e.clientY), moved: false, n: 0 });
+      CT.fx(e.clientX, e.clientY);
+      if (P.zone !== 'select') P.t = setTimeout(function again() {   // a side held: that arrow repeats
+        if (P.id === null || P.moved) return;
+        P.n++; if (!CT.send(P.zone, 1)) return;
+        P.t = setTimeout(again, Math.max(80, Math.round(180 * Math.pow(.86, P.n - 1))));
+      }, 500);
+    });
+    r.addEventListener('pointermove', e => {
+      if (e.pointerId !== P.id) return;
+      const dx = e.clientX - P.x, dy = e.clientY - P.y;
+      if (!P.moved) { if (Math.hypot(dx, dy) < 26 || P.n) return; P.moved = true; clearTimeout(P.t); }
+      P.ax += dx; P.ay += dy; P.x = e.clientX; P.y = e.clientY;
+      const h = Math.abs(P.ax) >= Math.abs(P.ay), a = h ? P.ax : P.ay;   // the way it mostly goes
+      if (Math.abs(a) < STEP) return;
+      const steps = Math.floor(Math.abs(a) / STEP), key = h ? (a > 0 ? 'right' : 'left') : (a > 0 ? 'down' : 'up');
+      if (h) { P.ax -= Math.sign(a) * steps * STEP; P.ay = 0; } else { P.ay -= Math.sign(a) * steps * STEP; P.ax = 0; }
+      CT.send(key, steps); CT.fx(e.clientX, e.clientY);
+    });
+    const end = e => {
+      if (e.pointerId !== P.id) return;
+      clearTimeout(P.t);
+      if (e.type === 'pointerup' && !P.moved && !P.n) CT.send(P.zone, 1);   // a tap: that side's arrow, or OK
+      P.id = null;
+    };
+    ['pointerup', 'pointercancel'].forEach(ev => r.addEventListener(ev, end));
+  },
+  fx(x, y) {   // a touch lights where it landed (transform and opacity only)
+    const d = doc.createElement('i'); d.className = 'c-fx'; d.style.left = x + 'px'; d.style.top = y + 'px'; body.appendChild(d);
+    const a = d.animate([{ transform: 'scale(.3)', opacity: .9 }, { transform: 'scale(1.6)', opacity: 0 }], { duration: 420, easing: 'ease-out' });
+    a.onfinish = () => d.remove();
+  },
+
+  // ---- YouTube: the picture is the TV's; this tile says what plays there ----
+  yt() {
+    const paint0 = YT.paint;
+    YT.playing = () => false;
+    YT.paint = hint => paint0(hint || (YT.k ? (YT.full ? 'FULL SCREEN ON THE TV · TAP HERE TO LEAVE IT' : 'PLAYING ON THE TV · TAP HERE FOR FULL SCREEN') : 'PICK A CHANNEL · IT PLAYS ON THE TV'));
+    YT.pick = k => {
+      if (YT.k === k) { YT.stop(); return; }   // the same channel again stops it, as on the TV
+      if (!LOUNGE.TV.some(x => x.k === k) || !CT.hub({ do: 'yt', k })) return;
+      YT.k = k; YT.full = false; YT.paint();
+    };
+    YT.stop = () => { if (YT.k && !CT.hub({ do: 'yt-stop' })) return; YT.k = null; YT.full = false; YT.paint(); };
+    YT.setFull = on => { if (!YT.k || !CT.hub({ do: 'yt-full', on: !!on })) return; YT.full = !!on; YT.paint(); };
+    $('yt-scr').addEventListener('click', () => { if (YT.k) YT.setFull(!YT.full); });
+    YT.paint();
+  },
+
+  // ---- typing on the TV: live, as on the remote ----
+  openType() {
+    let sh = $('c-typer');
+    if (!sh) {
+      sh = doc.createElement('div'); sh.id = 'c-typer';
+      sh.innerHTML = '<input id="c-ti" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="TYPE ON THE TV">'
+        + '<button type="button" id="c-del">DEL</button><button type="button" id="c-ent" class="go">ENTER</button><button type="button" id="c-x">DONE</button>';
+      body.appendChild(sh);
+      const ti = $('c-ti'), clear = () => { CT.typed = ''; ti.value = ''; };
+      ti.addEventListener('input', () => {
+        const v = ti.value.replace(/[\r\n]+/g, ' '), a = Array.from(CT.typed), b = Array.from(v);
+        let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+        CT.typed = v;
+        for (let del = a.length - i; del > 0; del -= 10) CT.send('del', Math.min(10, del));
+        const add = b.slice(i);
+        for (let s = 0; s < add.length; s += 200) CT.text(add.slice(s, s + 200).join(''));
+      });
+      ti.addEventListener('keydown', e => {
+        if (e.isComposing) return;
+        if (e.key === 'Enter') { e.preventDefault(); CT.send('enter', 1); clear(); }
+        else if (e.key === 'Backspace' && !ti.value) CT.send('del', 1);   // an empty field still erases on the TV
+      });
+      $('c-del').addEventListener('click', () => CT.send('del', 1));
+      $('c-ent').addEventListener('click', () => { CT.send('enter', 1); clear(); });
+      $('c-x').addEventListener('click', () => { sh.hidden = true; ti.blur(); });
+    }
+    sh.hidden = false; $('c-ti').focus();
+  },
+
+  // ---- the tablet's own screen: dim after 10 quiet minutes (as the remote did); any touch brightens it and still acts ----
+  wake() {
+    if (CT.dimmed) { CT.dimmed = false; body.classList.remove('dim'); if (APP0 && APP0.dim) try { APP0.dim(false); } catch (e) { /* the app */ } }
+    clearTimeout(CT.tDim);
+    CT.tDim = setTimeout(() => {
+      if (doc.hidden) { CT.wake(); return; }
+      CT.dimmed = true; body.classList.add('dim'); if (APP0 && APP0.dim) try { APP0.dim(true); } catch (e) { /* the app */ }
+    }, +Q.get('dim') || 600e3);
+  },
+};
+Object.assign(window.hub, { ctl: () => ({ asleep: CT.asleep, front: CT.front, vol: CT.vol, link: CT.link, adb: CT.adb, yt: YT.k, ytFull: YT.full, dimmed: CT.dimmed, apps: APPS.list.length }) });
+
 // ---- start ----
-if (APP) body.classList.add('app');
+if (APP0) body.classList.add('app');   // the app's "reduce motion" is Android's, not his: the HUB keeps moving (the controller too)
+if (CTL) body.classList.add('ctl');
 loadServices(); drawRings(); buildPods(); layout(true);
 if (S.tv) {
-  YT.build(); APPS.load(); NEWS.paint(); NEWS.load(); TV.home();
+  YT.build(); NEWS.paint(); NEWS.load();
+  if (CTL) CT.start(); else { APPS.load(); TV.home(); }
   setInterval(() => { if (!doc.hidden) NEWS.load(); }, 15 * 60e3);
 }
 addOns();

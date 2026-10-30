@@ -34,7 +34,7 @@ const keyCalls = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/a
 const sumKey = (k, from = 0) => keyCalls(from).filter(c => c.body.k === k).reduce((s, c) => s + c.body.n, 0);
 const anyKeyRequest = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/api/key');
 
-async function open(view, { query = '', app = false, lane = false } = {}) {
+async function open(view, { query = '', app = false, lane = false, at = '/' } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   const errors = [];
@@ -48,6 +48,7 @@ async function open(view, { query = '', app = false, lane = false } = {}) {
       window.__dim = []; window.__open = [];
       window.HubsApp = {
         dim: on => window.__dim.push(on),
+        panel: () => { window.__panel = (window.__panel || 0) + 1; },
         services: () => JSON.stringify({ services: [{ name: 'Lounge' }, { name: 'The Pit' }, { name: 'Home Assistant' }] }),
         open: i => window.__open.push(i),
       };
@@ -61,7 +62,7 @@ async function open(view, { query = '', app = false, lane = false } = {}) {
       }
     }
   }, [app, lane]);
-  await page.goto(mock.url + '/' + (query ? '?' + query : ''));
+  await page.goto(mock.url + at + (query ? '?' + query : ''));
   return { ctx, page, errors };
 }
 const until = (page, fn, ms = 3000, arg) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
@@ -586,6 +587,117 @@ async function otherSize(view) {
   } finally { await ctx.close(); }
 }
 
+// the tablet as the controller (10-30, his ask): the HUB drawn as on the TV (served by the stick at /hub?ctl), every touch to the TV
+async function controller() {
+  console.log(`\n${engineName} controller: the HUB on the tablet, driving the TV`);
+  mock.reset();
+  const { ctx, page, errors } = await open('tablet-land', { at: '/hub', query: 'ctl&boot=0&dim=6000&k=' + TOKEN, app: true, lane: true });
+  try {
+    await page.evaluate(() => { window.__lane.state = 'ok'; });
+    const c = () => page.evaluate(() => window.hub.ctl());
+    ok(await until(page, () => window.hub && window.hub.ctl && window.hub.ctl().link === 'ok' && window.hub.ctl().apps > 0, 8000), 'linked to the stick, the ring holds the stick\'s apps');
+    const geo = await page.evaluate(() => ({ W: innerWidth, H: innerHeight, sw: document.documentElement.scrollWidth, cls: document.body.className, url: location.href, k: localStorage.getItem('hubs.remote.k') }));
+    ok(engineName === 'webkit' || geo.W === 1443, `the TV's own width: ${geo.W} CSS px (1443 on the TV)`);
+    ok(/\bctl\b/.test(geo.cls) && /\btv\b/.test(geo.cls), 'the TV\'s layout, in controller mode');
+    ok(!/k=/.test(geo.url) && geo.k === TOKEN, 'the key left the address and is kept where the remote keeps it');
+    ok(geo.sw <= geo.W, `no sideways overflow (${geo.sw} in ${geo.W})`);
+    ok(await until(page, () => !document.body.classList.contains('landing') && !document.getElementById('boot'), 5000), 'the boot is over');
+    ok(await page.evaluate(() => document.getElementById('c-chip').hidden), 'an idle key link shows no chip (only a refused press does)');
+    await sleep(300);
+    await shot(page, 'ctl-tablet-land');
+    const shown = await page.evaluate(() => [...document.querySelectorAll('.pod,.label')].map(e => { const b = e.getBoundingClientRect(), cs = getComputedStyle(e); return (e.id || e.className) + ':' + (b.width > 10 && +cs.opacity > .05 ? 'on' : 'OFF'); }));
+    ok(shown.every(x => x.endsWith(':on')), `every pod and its label drawn (${shown.join(' ')})`);
+    const boxes = await page.evaluate(() => {
+      const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+      const bar = r(document.getElementById('ctl'));
+      const hub = [...document.querySelectorAll('#reactor,.pod,.label,.tapp,#tvcol,#yt-ch .ch,#foot')].filter(e => e.getClientRects().length).map(e => ({ id: e.id || e.className, ...r(e) }));
+      const keys = [...document.querySelectorAll('#ctl .ck')].map(e => ({ k: e.dataset.k || e.id, ...r(e) }));
+      return { bar, over: hub.filter(h => h.b > bar.t + 1).map(h => h.id), keys, vh: innerHeight, vw: innerWidth };
+    });
+    ok(boxes.bar.b <= boxes.vh + 1 && boxes.bar.t >= boxes.vh - 100, `the key bar sits at the bottom (${Math.round(boxes.bar.t)}-${Math.round(boxes.bar.b)} of ${boxes.vh})`);
+    ok(!boxes.over.length, 'nothing of the HUB reaches into the bar' + (boxes.over.length ? ': ' + boxes.over.join(', ') : ''));
+    ok(boxes.keys.every(k => k.r <= boxes.vw + 1 && k.l >= -1 && (k.r - k.l) * (1280 / boxes.vw) >= 64), `every key on screen and at least 64 px wide on the glass (${boxes.keys.length} keys)`);
+    ok(await page.locator('#c-now').textContent() === 'NETFLIX' && await page.locator('#c-vol').textContent() === 'VOL 15', 'NOW ON TV: NETFLIX, VOL 15');
+
+    // the clock is the arrows and OK
+    const g = await page.evaluate(() => { const b = document.getElementById('reactor').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, R: b.width / 2 }; });
+    const pr = () => page.evaluate(() => window.__lane.presses.slice());
+    let n0 = (await pr()).length;
+    await page.touchscreen.tap(g.cx, g.cy);
+    await page.touchscreen.tap(g.cx + g.R * .8, g.cy);
+    await page.touchscreen.tap(g.cx, g.cy - g.R * .8);
+    ok(await until(page, n => window.__lane.presses.length >= n + 3, 1500, n0) && (await pr()).slice(n0).join(' ') === 'select×1 right×1 up×1', `a tap: the middle is OK, a side its arrow (${(await pr()).slice(n0).join(' ')})`);
+    n0 = (await pr()).length;
+    const cdp = engineName === 'chromium' ? await ctx.newCDPSession(page) : null;
+    if (cdp) {
+      const tp = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+      await tp('touchStart', g.cx + 40, g.cy);
+      for (let k = 1; k <= 10; k++) { await tp('touchMove', g.cx + 40 - k * 20, g.cy + k); await sleep(16); }
+      await tp('touchEnd');
+      await sleep(250);
+      const got = (await pr()).slice(n0), lefts = got.filter(p => p.startsWith('left')).reduce((s, p) => s + +p.split('×')[1], 0);
+      ok(lefts === 3 && got.every(p => p.startsWith('left')), `a swipe of 200 px left walks 3 lefts and nothing else (${got.join(' ')})`);
+    }
+
+    // the ring, the pods, the channels
+    let from = mock.calls.length;
+    await page.locator('.tapp').nth(1).tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/launch' && c.delivered && c.body.pkg === mock.apps[1].pkg), 1500), 'an app on the ring opens on the TV (/api/launch)');
+    from = mock.calls.length;
+    await page.locator('.pod.pit').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.delivered && c.body.do === 'open' && c.body.i === 1), 1500), 'The Pit\'s pod opens The Pit on the TV (/api/hub open 1)');
+    from = mock.calls.length;
+    await page.locator('#yt-ch .ch[data-k="cnn"]').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt' && c.body.k === 'cnn'), 1500), 'a channel plays on the TV\'s tile (/api/hub yt cnn)');
+    ok(await until(page, () => /PLAYING ON THE TV/.test(document.getElementById('yt-hint').textContent) && document.querySelector('#yt-ch .ch.on') && !document.querySelector('#yt-scr iframe'), 1500), 'the tile here says PLAYING ON THE TV, and plays nothing itself');
+    await page.locator('#yt-scr').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-full' && c.body.on === true), 1500), 'a tap on the tile: full screen on the TV');
+    await page.locator('#yt-ch .ch[data-k="cnn"]').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/hub' && c.body.do === 'yt-stop'), 1500), 'the same channel again stops it');
+
+    // the bar
+    n0 = (await pr()).length; from = mock.calls.length;
+    await page.locator('#ctl [data-k="back"]').tap(); await page.locator('#ctl [data-k="volup"]').tap(); await page.locator('#ctl [data-k="mute"]').tap();
+    ok(await until(page, n => window.__lane.presses.length >= n + 3, 1500, n0) && (await pr()).slice(n0).join(' ') === 'back×1 volup×1 mute×1', `BACK, VOL +, MUTE go through the tablet's key lane (${(await pr()).slice(n0).join(' ')})`);
+    await page.locator('#ctl [data-k="home"]').tap();
+    ok(await mock.waitFor(() => mock.keys('home') === 1, 1500), 'HUB goes to the stick itself');
+    ok(await until(page, () => document.getElementById('c-now').textContent === 'THE HUB', 1500), 'and NOW ON TV follows: THE HUB');
+    mock.setVol({ l: 0, mute: true });
+    ok(await until(page, () => document.getElementById('c-vol').textContent === 'MUTED' && document.getElementById('c-mute').classList.contains('lit'), 1500), 'muted on the stick: MUTED, the mute key lit');
+    mock.setVol({ l: 9, mute: false });
+    ok(await until(page, () => document.getElementById('c-vol').textContent === 'VOL 9', 1500), 'VOL 9');
+    await page.locator('#c-type').tap();
+    await page.locator('#c-ti').fill('abc');
+    ok(await until(page, () => window.__lane.texts.join('') === 'abc', 1500), `TYPE: the text goes out live (${await page.evaluate(() => window.__lane.texts.join(''))})`);
+    await page.locator('#c-x').tap();
+
+    // off: only ON wakes it
+    await page.locator('#ctl [data-k="sleep"]').tap(); mock.setAwake(false);
+    ok(await until(page, () => document.body.classList.contains('asleep') && /TV OFF/.test(document.getElementById('c-now').textContent), 1500), 'OFF: TV OFF · PRESS ON');
+    n0 = (await pr()).length; from = mock.calls.length;
+    await page.touchscreen.tap(g.cx, g.cy); await page.locator('#ctl [data-k="volup"]').tap(); await page.locator('#ctl [data-k="home"]').tap(); await page.locator('.tapp').nth(0).tap();
+    await sleep(400);
+    ok((await pr()).length === n0 && !mock.calls.slice(from).some(c => c.method !== 'GET' && c.path.startsWith('/api/') && c.path !== '/api/events'), 'asleep: OK, VOL, HUB and an app send nothing');
+    await page.locator('#ctl [data-k="wake"]').tap(); mock.setAwake(true);
+    ok(await until(page, () => !document.body.classList.contains('asleep'), 4500), 'ON: awake again');
+    n0 = (await pr()).length;
+    await page.touchscreen.tap(g.cx, g.cy);
+    ok(await until(page, n => window.__lane.presses.length > n, 1500, n0), 'and OK goes out again');
+
+    // a story stays on the TV; the screen dims after its quiet time and any touch still acts
+    const href = await page.evaluate(() => location.href);
+    if (await page.locator('.nw').count()) { await page.locator('.nw').first().tap(); await sleep(300); }
+    ok(await page.evaluate(() => location.href) === href, 'a news row never takes this page away');
+    ok(await until(page, () => document.body.classList.contains('dim') && window.__dim.includes(true), 8000), 'quiet: the tablet\'s screen dims (?dim=6000 here; 10 minutes for real)');
+    n0 = (await pr()).length;
+    await page.touchscreen.tap(g.cx, g.cy);
+    ok(await until(page, n => !document.body.classList.contains('dim') && window.__dim[window.__dim.length - 1] === false && window.__lane.presses.length > n, 1500, n0), 'a touch brightens it and still presses OK');
+    await page.locator('#gear').tap();
+    ok(await page.evaluate(() => window.__panel === 1), 'the gear opens the tablet\'s own panel');
+    ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  } finally { await ctx.close(); }
+}
+
 const engines = [['webkit', webkit, {}]];
 if (!process.argv.includes('--webkit')) {
   if (fs.existsSync(SHELL)) engines.push(['chromium', chromium, { executablePath: SHELL }]);
@@ -600,6 +712,7 @@ try {
       await tabletFull();
       await otherSize('tablet-land');
       await otherSize('iphone');
+      if (n === 'chromium') await controller();   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
     } finally { await browser.close(); browser = null; }
   }
 } finally {

@@ -147,9 +147,12 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
         return;
       }
       case 'POST /api/hub': {
-        const ok = (b.do === 'yt' && typeof b.k === 'string' && /^[a-z0-9-]+$/.test(b.k)) || b.do === 'yt-stop' || (b.do === 'yt-full' && typeof b.on === 'boolean');
+        const ok = (b.do === 'yt' && typeof b.k === 'string' && /^[a-z0-9-]+$/.test(b.k)) || b.do === 'yt-stop' || (b.do === 'yt-full' && typeof b.on === 'boolean')
+          || (b.do === 'open' && Number.isInteger(b.i) && b.i >= 0 && b.i <= 2);
         if (!ok) return bad();
-        done(); if (!st.front.hub) { st.front = { ...HUB }; push(); }   // the HUB comes to the front first
+        done();
+        if (b.do === 'open') { st.front = { pkg: 'com.hectorfsv.hubs', name: 'Hubs', hub: false }; push(); return; }   // a pod: its hub fills the TV
+        if (!st.front.hub) { st.front = { ...HUB }; push(); }   // the HUB comes to the front first
         return;
       }
     }
@@ -182,6 +185,7 @@ export async function startMock({ port = 0, host = '127.0.0.1', token = TOKEN, p
     let m;
     rec.status = 200;
     if (u.pathname === '/' || u.pathname === '/remote.html') return file(res, path.join(ROOT, 'remote.html'));
+    if (u.pathname === '/hub') return file(res, path.join(ROOT, 'index.html'));   // the HUB, for the tablet as the controller (Hubs 2.11)
     if ((m = u.pathname.match(/^\/fonts\/([a-z0-9-]+)\.woff2$/))) return file(res, path.join(ROOT, 'fonts', m[1] + '.woff2'));
     if ((m = u.pathname.match(/^\/remote\/([a-z0-9-]+)\.(png|svg|webp|json|ogg|mp3|woff2)$/))) return file(res, path.join(ROOT, 'remote', `${m[1]}.${m[2]}`));
     rec.status = 404; empty(res, 404);
