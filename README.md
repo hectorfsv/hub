@@ -80,10 +80,24 @@ Back closes a sheet (the app sends Escape) and the ring returns to where it was.
 diet:** on a TV the 1-px scan line, the three orbit runners and 8 of the 14 motes stay out (`.tv` rules): on that chip
 every composited layer costs CPU every frame (measured 10-29, `projects/desk-tablet/README.md`); the tablet keeps them all.
 
+### The TV layout (10-29 night, his "Go and build the tv layout!")
+
+Only with the app's `tv` (the tablet is untouched): the reactor smaller and to the left; **his streaming apps as a ring
+around it** (`.tapp`, the app's own icons from `HubsApp.apps()`, at most 24 degrees apart on the left 240 degrees; Up and
+Down walk the ring, Right leaves it; Select asks the app to `launch` it; the clock's date line names the app the ring is on);
+the pods beyond; a right column: the weather folded to one line and six hours, **a YouTube tile** with the Lounge's 12
+channels copied word for word (`LOUNGE.TV`; Select plays with sound, Select again is full screen, Left/Right in full screen
+change the channel, Back leaves full screen, Back again stops; search is the YouTube app's chip: the Lounge's search goes
+through n8n behind its passphrase, the HUB has none) and **the news**: the Lounge's five free feeds and its ranking copied
+word for word (`LOUNGE.FEEDS`, `newsRank`: US, then Israel and the Middle East, then Mexico), read by the page every 15
+minutes on screen (0 n8n runs); Select opens a story on top (Back closes it). While a video plays the room holds still and
+the sparks step out; no night dimming on a TV; the clock's power bracket goes and its air reading and timer countdown are
+an HTML line under the date (the stick misdraws the core's SVG text).
+
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 202 checks (the TV view and the remote since 10-29):
+It has 218 checks (the TV view, the remote and the TV layout since 10-29):
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;
