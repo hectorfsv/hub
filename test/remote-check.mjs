@@ -51,6 +51,7 @@ async function open(view, { query = '', app = false, lane = false, at = '/' } = 
         panel: () => { window.__panel = (window.__panel || 0) + 1; },
         services: () => JSON.stringify({ version: '2.6', services: [{ name: 'Lounge', url: '', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/' }, { name: 'Home Assistant', url: '' }] }),
         open: i => window.__open.push(i),
+        battery: () => JSON.stringify({ level: .47, charging: false }),
       };
       if (lane) {   // the tablet's key lane: press/type answer with the link's state; keyLane() is how the app reports a change
         window.__lane = { state: 'off', presses: [], texts: [] };
@@ -742,6 +743,11 @@ async function controller(view) {
     await page.locator('.kp[data-k="lock"]').tap();
     ok(await until(page, () => window.hub.ctl().locked && document.body.classList.contains('locked'), 1000), 'LOCK: a touch locks');
     ok(await page.evaluate(() => document.getElementById('c-chs').hidden), 'and closes what was open');
+    await sleep(2600);
+    ok(await page.evaluate(() => { const c = s => getComputedStyle(document.querySelector(s)); return c('#banked').visibility === 'visible' && +c('#banked').opacity > .9 && +c('#shade').opacity > .15 && c('.sp').animationName === 'rise' && c('.r-dash').animationPlayState === 'paused' && c('#motes').display === 'none'; }), 'locked: the fire banked, the screen dimmer, the rings stopped');
+    ok(await page.evaluate(() => { const r = document.getElementById('arrows'), o = getComputedStyle(r).opacity; return +o === 1; }), 'locked: the arrows keep their light');
+    ok(await page.evaluate(async () => { const b = document.body; b.classList.add('forge'); await new Promise(r => setTimeout(r, 700)); const o = +getComputedStyle(document.getElementById('pods')).opacity; b.classList.remove('forge'); return o > .7; }), 'locked during a cook: the Pit stays lit');
+    await page.screenshot({ path: path.join(SHOTS, `ctl-locked-${land ? 'land' : 'up'}${engineName === 'chromium' ? '-chromium' : ''}.png`) });
     n0 = (await pr()).length; from = mock.calls.length;
     const dead = ['home', 'back', 'menu', 'playpause', 'rewind', 'forward', 'wake', 'sleep'].map(k => `.kp[data-k="${k}"]`).concat('.tapp', '.pod', '#c-tv-pick', '#c-kb [data-k="search"]', '#c-type', '#yts-go');
     await page.touchscreen.tap(g.cx, g.cy);
@@ -766,6 +772,7 @@ async function controller(view) {
     ok(await page.evaluate(() => window.hub.ctl().locked), 'locked: 0.9 s held does not open it');
     await hold(2200);
     ok(await until(page, () => !window.hub.ctl().locked && !document.body.classList.contains('locked'), 800), 'held 2 s: open');
+    ok(/BATTERY\s*47%/.test(await page.textContent('#tvline')), `the controller's line is the tablet's battery, from the app (${await page.textContent('#tvline')})`);
     n0 = (await pr()).length;
     await page.touchscreen.tap(g.cx, g.cy);
     ok(await until(page, n => window.__lane.presses.length > n, 1500, n0), 'open: OK goes out again');
@@ -773,7 +780,7 @@ async function controller(view) {
     mock.setAwake(false);
     ok(await until(page, () => document.body.classList.contains('asleep') && !window.hub.ctl().locked, 4500), 'the TV going off ends the lock (ON must never be behind it)');
     await sleep(2600);
-    ok(await page.evaluate(() => { const c = s => getComputedStyle(document.querySelector(s)); return c('#night').visibility === 'visible' && c('#shade').visibility === 'visible' && +c('#shade').opacity > .05 && c('.r-dash').animationPlayState === 'paused' && c('#motes').display === 'none'; }), 'asleep: the night and the shade up, the rings stopped');
+    ok(await page.evaluate(() => { const c = s => getComputedStyle(document.querySelector(s)); return c('#night').visibility === 'visible' && c('#banked').visibility === 'hidden' && c('#shade').visibility === 'visible' && +c('#shade').opacity > .05 && c('.r-dash').animationPlayState === 'paused' && c('#motes').display === 'none'; }), 'asleep: the night and the shade up, the rings stopped');
     await page.screenshot({ path: path.join(SHOTS, `ctl-night-${land ? 'land' : 'up'}${engineName === 'chromium' ? '-chromium' : ''}.png`) });
     await page.locator('.kp[data-k="wake"]').tap(); mock.setAwake(true);
     ok(await until(page, () => !document.body.classList.contains('asleep'), 4500), 'ON from the night: awake');

@@ -462,6 +462,24 @@ body.asleep .kp[data-k=wake] .g{background:radial-gradient(circle,rgba(255,214,1
 body.locked *{pointer-events:none!important}
 body.locked #reactor,body.locked .kp.free{pointer-events:auto!important}
 body.locked #pods,body.locked .label,body.locked #apps,body.locked #bottom,body.locked .kp:not(.free){opacity:.28}
+/* the film is on (his 10-30: "when it's locked cause im watching a movie, can something happen?"): the fire banked for the night.
+   A bed of coals breathing at the foot, a few sparks going up, the screen dimmer. The rings stop; only transform and opacity move,
+   in steps, on small layers. Nothing here may hide the Pit: during a cook it stays lit. The TV off keeps its own night */
+#banked{position:fixed;inset:0;z-index:0;visibility:hidden;opacity:0;transition:opacity 2.4s ease,visibility 0s 2.4s;pointer-events:none;overflow:hidden;
+  background:radial-gradient(ellipse 140% 92% at 50% 114%,#2C1409 0%,#170B06 44%,#080403 100%)}
+#banked b{position:absolute;left:-10%;right:-10%;bottom:-22vh;height:58vh;background:radial-gradient(ellipse 50% 50% at 50% 62%,rgba(255,106,26,.36) 0%,rgba(255,80,16,.13) 46%,transparent 72%)}
+.sp{position:absolute;bottom:7vh;width:3px;height:3px;border-radius:50%;background:#FFD27A;box-shadow:0 0 5px 1px rgba(255,120,30,.75);opacity:0}
+body.locked:not(.asleep) #banked{visibility:visible;opacity:1;transition:opacity 2.4s ease}
+body.locked:not(.asleep) #shade{visibility:visible;opacity:.25;transition:opacity 2.4s ease}
+body.locked:not(.asleep) #banked b{animation:coals 9s steps(36) infinite alternate}
+body.locked:not(.asleep) .sp{animation:rise 24s linear infinite}
+@keyframes coals{from{opacity:.55;transform:scaleY(.94)}to{opacity:1;transform:scaleY(1.06)}}
+@keyframes rise{0%{transform:translate3d(0,0,0);opacity:0;animation-timing-function:steps(20)}8%{opacity:.95;animation-timing-function:steps(110)}55%{transform:translate3d(var(--dx),-50vh,0);opacity:.55;animation-timing-function:steps(110)}100%{transform:translate3d(0,-92vh,0);opacity:0}}
+body.locked #top,body.locked #orbit{opacity:.28}
+body.locked #reactor>*:not(.clock):not(.halo):not(.core):not(#arrows){opacity:.16}
+body.locked #scan,body.locked #motes,body.locked #runners{display:none}
+body.locked .spin,body.locked .pulse,body.locked .pod *{animation-play-state:paused}
+body.locked.forge #pods,body.locked.forge .label{opacity:.8}
 .kp .h{inset:4px;background:radial-gradient(circle,rgba(255,233,176,.6),rgba(255,181,71,.3));transform:scale(0)}
 .kp.hold .h{transform:scale(1);transition:transform 2s linear}
 .kp[data-k=lock] .cap{top:auto;bottom:calc(100% + 9px)}
@@ -1196,16 +1214,21 @@ function addOns() {
 // power: the tablet's own battery (Android's web view tells the page; an iPhone doesn't, and the bracket shows a dash)
 function power() {
   if (DEMO) { S.bat = { level: .64, charging: false }; return; }
+  const got = (level, charging) => {
+    const was = S.bat;
+    S.bat = { level, charging };
+    if (was && !was.charging && charging) spark();
+    if (charging) S.lowSaid = false;
+    else if (level < .1 && !S.lowSaid) { S.lowSaid = true; toast('BATTERY LOW · PLUG ME IN', 5000); }
+    renderGauges();
+  };
+  if (CTL && APP0 && APP0.battery) {   // the controller is a plain http page, which has no getBattery: the app tells it
+    const read = () => { try { const b = JSON.parse(APP0.battery()); got(b.level, b.charging); } catch (e) { /* the next minute */ } };
+    read(); setInterval(read, 60e3); return;
+  }
   if (!navigator.getBattery) return;
   navigator.getBattery().then(b => {
-    const read = () => {
-      const was = S.bat;
-      S.bat = { level: b.level, charging: b.charging };
-      if (was && !was.charging && b.charging) spark();
-      if (b.charging) S.lowSaid = false;
-      else if (b.level < .1 && !S.lowSaid) { S.lowSaid = true; toast('BATTERY LOW · PLUG ME IN', 5000); }
-      renderGauges();
-    };
+    const read = () => got(b.level, b.charging);
     read(); b.addEventListener('levelchange', read); b.addEventListener('chargingchange', read);
   }).catch(() => {});
 }
@@ -1248,11 +1271,17 @@ function renderGauges() {
     + `<text class="g-lab" id="pw-lab" x="${chg ? -39.4 : -44.6}" y="38.6" fill="${low ? '#FF8A80' : '#FFD27A'}">${pct == null ? '—' : pct + '%'}</text>`
     + `<text class="g-lab" id="aq-lab" x="44.6" y="38.6" text-anchor="end" fill="${aq != null && aq > 100 ? ac : '#FFD27A'}"><tspan fill="#9A8C8A">AQI </tspan>${aq == null ? '—' : aq}</text>`;
 }
-// a TV's line under the clock's date (its SVG text misplaces on the stick): the timer while it runs, else the air
+// a TV's line under the clock's date (its SVG text misplaces on the stick): the timer while it runs, else the air;
+// on the controller the tablet's battery, in the air's place (his 10-30)
 function tvLine() {
   const el = $('tvline'); if (!el || !S.tv) return;
   const t = S.tmr;
   if (t) { el.innerHTML = t.done ? '<b>TIMER DONE</b>' : `TIMER <b>${clockLeft(t.end - Date.now())}</b>`; return; }
+  if (CTL && S.bat) {
+    const b = S.bat, low = !b.charging && b.level < .2;
+    el.innerHTML = `${b.charging ? 'CHARGING' : 'BATTERY'} <b${low ? ' style="color:#FF3B30"' : ''}>${Math.round(b.level * 100)}%</b>`;
+    return;
+  }
   const aq = S.air && Date.now() - S.air.at < 3 * 3600e3 ? Math.round(S.air.aqi) : null;
   const c = aq == null ? '' : aq <= 50 ? '#FFD27A' : aq <= 100 ? '#FFB547' : aq <= 150 ? '#FF8A3A' : '#FF3B30';
   el.innerHTML = aq == null ? '' : `AIR <b style="color:${c}">${aq}</b> AQI`;
@@ -1540,6 +1569,7 @@ function placeApps() {
 const YT = {
   k: null, c: null, full: false,
   open: false,
+  state: null, now: 0, held: false,   // what the player last said (null: nothing yet); held: he paused it
   build() {   // CHANNELS opens the Lounge's groups over the panel: one sheet for the TV and the tablet (his 10-30: "take out the name of the channels, put the sub menu like the remote")
     const groups = [];
     LOUNGE.TV.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, list: [] }); g.list.push(c); });
@@ -1582,14 +1612,42 @@ const YT = {
     const f = doc.createElement('iframe'); f.title = c.name;
     f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     f.referrerPolicy = 'strict-origin-when-cross-origin';   // YouTube refuses embeds that do not say which site they are on (the Lounge's lesson)
-    f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), 'https://www.youtube.com'); } catch (e) { /* not ready */ } });
-    f.src = YT.src(c); $('yt-scr').appendChild(f); YT.k = c.k; YT.c = c; YT.paint();
+    f.addEventListener('load', () => YT.say({ event: 'listening', id: 1, channel: 'widget' }));
+    f.src = YT.src(c); $('yt-scr').appendChild(f); YT.k = c.k; YT.c = c; YT.state = null; YT.now = 0; YT.held = false; YT.paint();
+    YT.watch(0);
     if (pic) TV.ring($('yt-scr'));                             // a channel changed from the picture: the ring stays on it
   },
   stop() {
     const f = $('yt-scr').querySelector('iframe'), pic = TV.cur === $('yt-scr');
+    clearTimeout(YT.wd); YT.state = null;
     if (f) f.remove(); YT.setFull(false); YT.k = null; YT.c = null; YT.paint();
     if (pic) TV.ring($('yt-go'));                              // the picture is gone: the ring goes to CHANNELS
+  },
+  say(m) {
+    const f = $('yt-scr').querySelector('iframe');
+    if (f) try { f.contentWindow.postMessage(JSON.stringify(m), 'https://www.youtube.com'); } catch (e) { /* not ready */ }
+  },
+  cmd(func, args) { YT.say({ event: 'command', func, args: args || [], id: 1, channel: 'widget' }); },
+  // the remote's play keys (his 10-30: "no way to pause"): no key reaches a player inside a frame, so the app hands them here
+  media(code) {
+    if (!YT.playing()) return;
+    if (code === 85) code = YT.state === 1 || YT.state === 3 ? 127 : 126;   // the play / pause key
+    if (code === 127) { YT.held = true; YT.cmd('pauseVideo'); }
+    else if (code === 126) { YT.held = false; YT.cmd('playVideo'); }
+    else YT.cmd('seekTo', [Math.max(0, YT.now + (code === 90 ? 30 : -30)), true]);
+  },
+  // a channel that opens and sits there, a still with nothing to click on a TV (his 10-30): ask it to play. Only the player's own
+  // word ends it: this stick takes up to 11 s to start one (measured), and a player that has said nothing may well be playing
+  watch(n) {
+    const tries = 4;   // 32 s
+    clearTimeout(YT.wd);
+    YT.wd = setTimeout(() => {
+      if (!YT.playing() || YT.state === 1 || YT.held) return;
+      if (YT.state === null) YT.say({ event: 'listening', id: 1, channel: 'widget' });
+      else if (n >= tries) { const name = $('yt-name').textContent; YT.stop(); YT.paint(`${name} IS NOT PLAYING · PICK ANOTHER`); return; }
+      else if (YT.state !== 3) YT.cmd('playVideo');
+      if (n < tries + 6) YT.watch(n + 1);
+    }, n ? 5000 : 12000);
   },
   setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); YT.nudge(); },
   // the tablet's FULL SCREEN and SMALL reach the page through the stick's activity, which pauses and resumes it, and the video
@@ -1617,7 +1675,11 @@ window.addEventListener('message', e => {   // the player says when a stream has
   const f = $('yt-scr').querySelector('iframe'); if (!f || e.source !== f.contentWindow) return;
   let d = null; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
   const err = d && (d.event === 'onError' ? d.info : d.info && d.info.errorCode);
-  if (err) { const name = $('yt-name').textContent; YT.stop(); YT.paint(`${name} HAS ENDED (YOUTUBE ${err}) · PICK ANOTHER`); }
+  if (err) { const name = $('yt-name').textContent; YT.stop(); YT.paint(`${name} HAS ENDED (YOUTUBE ${err}) · PICK ANOTHER`); return; }
+  if (!d) return;
+  if (d.event === 'onStateChange' && typeof d.info === 'number') YT.state = d.info;
+  if (d.info && typeof d.info.playerState === 'number') YT.state = d.info.playerState;
+  if (d.info && typeof d.info.currentTime === 'number') YT.now = d.info.currentTime;
 });
 
 // ---- a quick YouTube search (10-30, his ask, like the Lounge's TV): the stick reads YouTube's own results page (YtSearch in
@@ -1995,6 +2057,10 @@ const CT = {
     const stars = (n, tone) => Array.from({ length: n }, () => `${rnd(0, 100).toFixed(2)}vw ${rnd(0, 100).toFixed(2)}vh 0 ${Math.random() < .2 ? 1 : .35}px rgba(${tone},${rnd(.35, .95).toFixed(2)})`).join(',');
     sky.innerHTML = `<i class="st" style="box-shadow:${stars(130, '226,232,255')}"></i><i class="st tw" style="box-shadow:${stars(45, '255,233,176')}"></i><i id="meteor"></i>`;
     body.insertBefore(sky, $('forge'));
+    const coals = doc.createElement('div'); coals.id = 'banked'; coals.setAttribute('aria-hidden', 'true');   // the locked tablet's fire
+    coals.innerHTML = '<b></b>' + Array.from({ length: 9 }, () => { const t = rnd(18, 34);
+      return `<i class="sp" style="left:${rnd(6, 94).toFixed(1)}vw;--dx:${rnd(-4, 4).toFixed(1)}vw;animation-duration:${t.toFixed(1)}s;animation-delay:-${rnd(0, t).toFixed(1)}s"></i>`; }).join('');
+    body.insertBefore(coals, $('forge'));
     const shade = doc.createElement('div'); shade.id = 'shade'; shade.setAttribute('aria-hidden', 'true'); body.appendChild(shade);
     // what is on the TV, in the clock under the date
     const now = doc.createElement('div'); now.className = 'date'; now.id = 'c-on';

@@ -560,6 +560,24 @@ try {
     ok(!(await page.$('#yt-scr iframe')) && await cur('#yt-go'), 'Select on the playing channel stops it: a channel is a switch');
     await page.evaluate(() => hub.tv().YT.menu(true)); await page.evaluate(() => hub.tv().YT.pick('cnn')); await page.waitForTimeout(200);
     ok(await page.evaluate(() => document.getElementById('c-chs').hidden && !!document.querySelector('#yt-scr iframe')), 'a channel sent from the tablet closes a sheet left open on the TV');
+    const pl = await page.evaluate(async () => {   // the remote's play keys and the channel that sits there: what the player is told, with its clock at 1/100
+      const Y = hub.tv().YT, said = [], r = {}, say = Y.say, st = window.setTimeout;
+      Y.say = m => said.push(m.func ? m.func + (m.args.length ? ':' + m.args[0] : '') : m.event);
+      const key = c => { said.length = 0; Y.media(c); return said.join(); };
+      Y.state = 1; Y.now = 100;
+      r.pause = key(85); r.held = Y.held; Y.state = 2; r.play = key(85); r.free = !Y.held; r.back = key(89); r.fwd = key(90);
+      window.setTimeout = (f, ms) => st(f, ms / 100);
+      const wait = async (state, held, n) => { said.length = 0; Y.state = state; Y.held = held; Y.watch(n); await new Promise(res => st(res, 150)); clearTimeout(Y.wd); return said[0] || ''; };
+      r.sits = await wait(5, false, 1); r.buffers = await wait(3, false, 1); r.plays = await wait(1, false, 1); r.paused = await wait(2, true, 1); r.silent = await wait(null, false, 4);
+      r.alive = Y.playing();
+      await wait(5, false, 4); r.gone = !Y.playing(); r.hint = document.getElementById('yt-hint').textContent;
+      window.setTimeout = st; Y.say = say;
+      return r; });
+    ok(pl.pause === 'pauseVideo' && pl.held && pl.play === 'playVideo' && pl.free, `the play key pauses a playing channel and plays a paused one (his 10-30: "no way to pause"; ${JSON.stringify(pl)})`);
+    ok(pl.back === 'seekTo:70' && pl.fwd === 'seekTo:130', 'rewind and forward seek 30 s');
+    ok(pl.sits === 'playVideo' && pl.buffers === '' && pl.plays === '' && pl.paused === '', 'a channel that sits on a still is asked to play; one that buffers, plays or was paused by him is left alone');
+    ok(pl.silent === 'listening' && pl.alive, 'a player that has said nothing is never stopped: it is only asked to talk');
+    ok(pl.gone && /IS NOT PLAYING/.test(pl.hint), `one that still will not play goes, and says so (${pl.hint})`);
     await page.evaluate(() => hub.tv().YT.stop());
     await page.keyboard.press('ArrowRight');
     ok(await cur('#yt-app'), 'Right of CHANNELS: the YouTube app');
