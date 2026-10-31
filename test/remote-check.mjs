@@ -613,7 +613,7 @@ async function ctlGeometry(page, name) {
   ok(!inRing.length, `${name}: nothing sits on the clock's ring` + (inRing.length ? ': ' + inRing.map(d => d.id).join(', ') : ''));
   const glass = (m.land ? 1280 : 800) / m.W, small = m.discs.filter(d => /^(wake|sleep|mute|volup|voldown|menu|home|back)$/.test(d.id) && (d.r - d.l) * glass < 80);
   ok(!small.length, `${name}: the keys at least 80 px on the glass (${Math.round((m.discs.find(d => d.id === 'home').r - m.discs.find(d => d.id === 'home').l) * glass)})` + (small.length ? ': ' + small.map(d => d.id).join(', ') : ''));
-  const hit = m.panel.filter(p => m.land ? p.l < m.sys.r - 1 : p.id === 'greet' ? p.b > m.sys.t + 1 : p.t < m.sys.b - 1);   // upright the greeting tops the page
+  const hit = m.panel.filter(p => m.land ? p.l < m.sys.r - 1 : p.id === 'greet' ? [...m.discs, ...m.caps].some(d => d.l < p.r - 1 && d.r > p.l + 1 && d.t < p.b - 1 && d.b > p.t + 1) : p.t < m.sys.b - 1);   // upright the greeting tops the page, beside the LOCK key
   ok(!hit.length, `${name}: the panel clear of the rings (${m.land ? 'to the right' : 'below'})` + (hit.length ? ': ' + hit.map(p => p.id).join(', ') : ''));
   return m;
 }
@@ -729,6 +729,56 @@ async function controller(view) {
     n0 = (await pr()).length;
     await page.touchscreen.tap(g.cx, g.cy);
     ok(await until(page, n => window.__lane.presses.length > n, 1500, n0), 'and OK goes out again');
+
+    // the lock: a film stays on. The arrows and the volume answer, nothing else, until LOCK is held
+    const touch = async sel => { const b = await page.locator(sel).first().boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); };
+    const hold = (ms) => page.evaluate(ms => new Promise(done => {
+      const el = document.querySelector('.kp[data-k="lock"]'), p = { pointerId: 9, bubbles: true, cancelable: true };
+      el.dispatchEvent(new PointerEvent('pointerdown', p));
+      setTimeout(() => { el.dispatchEvent(new PointerEvent('pointerup', p)); done(); }, ms);
+    }), ms);
+    await page.locator('#c-tv-pick').tap();
+    ok(await until(page, () => !document.getElementById('c-chs').hidden, 1000), 'the channels open before the lock');
+    await page.locator('.kp[data-k="lock"]').tap();
+    ok(await until(page, () => window.hub.ctl().locked && document.body.classList.contains('locked'), 1000), 'LOCK: a touch locks');
+    ok(await page.evaluate(() => document.getElementById('c-chs').hidden), 'and closes what was open');
+    n0 = (await pr()).length; from = mock.calls.length;
+    const dead = ['home', 'back', 'menu', 'playpause', 'rewind', 'forward', 'wake', 'sleep'].map(k => `.kp[data-k="${k}"]`).concat('.tapp', '.pod', '#c-tv-pick', '#c-kb [data-k="search"]', '#c-type', '#yts-go');
+    await page.touchscreen.tap(g.cx, g.cy);
+    for (const sel of dead) await touch(sel);
+    await sleep(400);
+    ok((await pr()).length === n0 && !mock.calls.slice(from).some(c => c.method !== 'GET' && c.path.startsWith('/api/') && c.path !== '/api/events'), `locked: OK and ${dead.length} others send nothing`);
+    ok(await page.evaluate(() => !document.getElementById('c-typer') || document.getElementById('c-typer').hidden), 'locked: the typing box stays shut');
+    ok(await page.evaluate(sels => sels.every(s => { const b = document.querySelector(s).getBoundingClientRect(), t = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return !t || !t.closest(s); }), dead), 'locked: no touch reaches any of them');
+    for (const [dx, dy, k] of [[0, -.8, 'up'], [.8, 0, 'right'], [0, .8, 'down'], [-.8, 0, 'left']]) {
+      n0 = (await pr()).length;
+      await page.touchscreen.tap(g.cx + dx * g.R, g.cy + dy * g.R);
+      ok(await until(page, ([n, k]) => window.__lane.presses.slice(n).includes(k + '×1'), 1500, [n0, k]), `locked: the ${k} arrow goes out`);
+    }
+    for (const k of ['volup', 'voldown', 'mute']) {
+      n0 = (await pr()).length;
+      await touch(`.kp[data-k="${k}"]`);
+      ok(await until(page, ([n, k]) => window.__lane.presses.slice(n).includes(k + '×1'), 1500, [n0, k]), `locked: ${k} goes out`);
+    }
+    await touch('.kp[data-k="lock"]'); await sleep(2300);
+    ok(await page.evaluate(() => window.hub.ctl().locked), 'locked: a touch on LOCK does not open it');
+    await hold(900);
+    ok(await page.evaluate(() => window.hub.ctl().locked), 'locked: 0.9 s held does not open it');
+    await hold(2200);
+    ok(await until(page, () => !window.hub.ctl().locked && !document.body.classList.contains('locked'), 800), 'held 2 s: open');
+    n0 = (await pr()).length;
+    await page.touchscreen.tap(g.cx, g.cy);
+    ok(await until(page, n => window.__lane.presses.length > n, 1500, n0), 'open: OK goes out again');
+    await page.locator('.kp[data-k="lock"]').tap();
+    mock.setAwake(false);
+    ok(await until(page, () => document.body.classList.contains('asleep') && !window.hub.ctl().locked, 4500), 'the TV going off ends the lock (ON must never be behind it)');
+    await sleep(2600);
+    ok(await page.evaluate(() => { const c = s => getComputedStyle(document.querySelector(s)); return c('#night').visibility === 'visible' && c('#shade').visibility === 'visible' && +c('#shade').opacity > .05 && c('.r-dash').animationPlayState === 'paused' && c('#motes').display === 'none'; }), 'asleep: the night and the shade up, the rings stopped');
+    await page.screenshot({ path: path.join(SHOTS, `ctl-night-${land ? 'land' : 'up'}${engineName === 'chromium' ? '-chromium' : ''}.png`) });
+    await page.locator('.kp[data-k="wake"]').tap(); mock.setAwake(true);
+    ok(await until(page, () => !document.body.classList.contains('asleep'), 4500), 'ON from the night: awake');
+    await sleep(2600);
+    ok(await page.evaluate(() => getComputedStyle(document.getElementById('night')).visibility === 'hidden'), 'awake: the night off the screen (no layer left behind)');
 
     if (land) {   // a story stays on the TV; the screen dims after its quiet time and any touch still acts
       const href = await page.evaluate(() => location.href);

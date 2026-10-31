@@ -439,9 +439,33 @@ body.ctl.yts-on #yts-l{display:flex}
 .cc.on b::before{content:'▶ '}
 .cc.cur{border-color:var(--gold-hot);box-shadow:0 0 0 2px var(--gold-hot),0 0 22px rgba(255,181,71,.5)}
 body.tv:not(.ctl) .cc small{font-size:10.5px}
-/* the TV asleep: only ON is lit */
-body.asleep #reactor,body.asleep #pods,body.asleep .label,body.asleep #apps,body.asleep #bottom,body.asleep .kp:not([data-k=wake]){opacity:.28}
+/* the TV asleep (his 10-30: "something for the background and maybe dim the screen a lil bit"): the night behind the keys, the
+   reactor eclipsed around the clock, a shade over it all, only ON lit. The rings stop; the sky moves at 2 frames a second */
+#night{position:fixed;inset:0;z-index:0;visibility:hidden;opacity:0;transition:opacity 2.4s ease,visibility 0s 2.4s;pointer-events:none;overflow:hidden;
+  background:linear-gradient(118deg,transparent 30%,rgba(140,165,255,.06) 46%,rgba(255,233,176,.05) 53%,transparent 68%),radial-gradient(ellipse 130% 100% at 50% var(--bgY),#111A33 0%,#0B1122 46%,#06070E 100%)}
+#shade{position:fixed;inset:0;z-index:30;visibility:hidden;opacity:0;transition:opacity 2.4s ease,visibility 0s 2.4s;pointer-events:none;background:#000}
+body.asleep #night{visibility:visible;opacity:1;transition:opacity 2.4s ease}
+body.asleep #shade{visibility:visible;opacity:.32;transition:opacity 2.4s ease}
+.st{position:absolute;left:0;top:0;width:1px;height:1px;border-radius:50%}
+body.asleep .st.tw{animation:tw 10s steps(20) infinite alternate}
+@keyframes tw{from{opacity:.25}to{opacity:1}}
+#meteor{position:absolute;left:0;top:0;width:120px;height:1.5px;opacity:0;background:linear-gradient(90deg,transparent,rgba(255,233,176,.9))}
+body.asleep #pods,body.asleep .label,body.asleep #apps,body.asleep #bottom,body.asleep #top,body.asleep #orbit,body.asleep .kp:not([data-k=wake]){opacity:.28}
+body.asleep #reactor>*:not(.clock):not(.halo):not(.core){opacity:.16}
+body.asleep #scan,body.asleep #motes,body.asleep #runners{display:none}
+body.asleep .spin,body.asleep .pulse,body.asleep .pod *{animation-play-state:paused}
+body.asleep .halo:not(.hot){background:radial-gradient(circle closest-side,transparent 44%,rgba(255,240,205,.55) 45.6%,rgba(255,205,130,.22) 53%,rgba(150,175,255,.08) 72%,transparent 96%);animation:breathe 12s steps(24) infinite alternate}
+body.asleep .core{background:#05060C;box-shadow:0 0 0 1.5px rgba(255,240,205,.85),0 0 calc(var(--R)*.14) rgba(255,220,160,.5)}
+body.asleep.forge #pods,body.asleep.forge .label{opacity:.8}
 body.asleep .kp[data-k=wake] .g{background:radial-gradient(circle,rgba(255,214,140,.5) 0%,rgba(255,181,71,.16) 42%,transparent 68%)}
+/* the lock (his 10-30): a film stays on. Nothing takes a touch but the arrows, the volume and LOCK itself, held to open */
+body.locked *{pointer-events:none!important}
+body.locked #reactor,body.locked .kp.free{pointer-events:auto!important}
+body.locked #pods,body.locked .label,body.locked #apps,body.locked #bottom,body.locked .kp:not(.free){opacity:.28}
+.kp .h{inset:4px;background:radial-gradient(circle,rgba(255,233,176,.6),rgba(255,181,71,.3));transform:scale(0)}
+.kp.hold .h{transform:scale(1);transition:transform 2s linear}
+.kp[data-k=lock] .cap{top:auto;bottom:calc(100% + 9px)}
+body.land .kp[data-k=lock] .cap{display:none}
 #c-typer{position:fixed;left:50%;top:18px;z-index:62;transform:translateX(-50%);display:flex;gap:10px;padding:12px;border-radius:16px;background:rgba(14,9,7,.97);
   box-shadow:0 0 0 1px rgba(255,181,71,.45),0 18px 60px rgba(0,0,0,.8)}
 #c-typer[hidden]{display:none}
@@ -1788,12 +1812,14 @@ window.addEventListener('blur', () => setTimeout(() => {
 // over it; The Pit and Home Assistant above. The panel (to the right sideways, below upright): the weather, live TV with
 // its channel picker, the YouTube search, the TV's search and typing keys, and the news (sideways only). The stick serves
 // this page at /hub?ctl, the remote's own address, so the remote's API and key are this page's too. Keys go through the
-// tablet app's adb lane (HubsApp.press) when it has one; HUB is always the stick's own. While the TV sleeps only ON goes out.
+// tablet app's adb lane (HubsApp.press) when it has one; HUB is always the stick's own. While the TV sleeps only ON goes out;
+// while LOCK is on only the arrows and the volume do (it ends when the TV goes off, a film being over by then).
 const CT = {
-  k: null, lane: null, adb: 'ok', refused: false, link: 'boot', front: null, vol: null, asleep: false, powerAt: 0, stAwake: null, tPow: 0, es: null, tDim: 0, dimmed: false, typed: '',
+  k: null, lane: null, adb: 'ok', refused: false, link: 'boot', front: null, vol: null, asleep: false, powerAt: 0, stAwake: null, tPow: 0, es: null, tDim: 0, dimmed: false, typed: '', locked: false, tMet: 0,
+  FREE: { up: 1, down: 1, left: 1, right: 1, volup: 1, voldown: 1, mute: 1 },   // what LOCK leaves on (his 10-30: "just volume and arrows")
   // the keys in the rings: a = the angle (0 = right, 90 = down), m = the inner ring's smaller pods
   KEYS: [
-    { k: 'wake', ic: 'power', l: 'ON', a: 200 }, { k: 'sleep', ic: 'moon', l: 'OFF', a: 160 },
+    { k: 'wake', ic: 'power', l: 'ON', a: 200 }, { k: 'sleep', ic: 'moon', l: 'OFF', a: 160 }, { k: 'lock', ic: 'open', l: 'LOCK', a: 270 },
     { k: 'volup', ic: 'volup', l: 'VOL +', a: 335, rep: 1 }, { k: 'mute', v: 1, l: 'MUTE', a: 0 }, { k: 'voldown', ic: 'voldn', l: 'VOL −', a: 25, rep: 1 },
     { k: 'menu', ic: 'menu', l: 'MENU', a: 52 }, { k: 'home', ic: 'hub', l: 'HUB', a: 90 }, { k: 'back', ic: 'back', l: 'BACK', a: 128 },
     { k: 'forward', ic: 'fwd', l: 'FORWARD', a: 65, m: 1, rep: 1 }, { k: 'playpause', ic: 'play', l: 'PLAY / PAUSE', a: 90, m: 1 }, { k: 'rewind', ic: 'rew', l: 'REWIND', a: 115, m: 1, rep: 1 },
@@ -1811,8 +1837,10 @@ const CT = {
     window.keyLane = a => { if (CT.lane) { CT.adb = a; if (a === 'ok') CT.refused = false; CT.status(); } };   // the app: its link to the stick changed
     $('ver').textContent = 'HUB · CONTROLLER';
     CT.build(); CT.pad($('reactor')); CT.yt(); layout(true);
+    if (store.get('hub.lock')) CT.lock(true);   // a reload in the middle of a film
     doc.addEventListener('click', e => { if (e.target.closest && e.target.closest('.nw')) e.preventDefault(); }, true);   // a story is the TV's, never this page's
     doc.addEventListener('pointerdown', CT.wake, true);
+    doc.addEventListener('pointerdown', e => { if (CT.locked && !e.target.closest('#reactor,.kp.free')) CT.nudge(); });
     CT.connect(); CT.apps(); CT.wake(); CT.status();
   },
 
@@ -1835,7 +1863,26 @@ const CT = {
     } catch (e) { toast('THE STICK DID NOT ANSWER'); }
     return false;
   },
-  gate(k) { if (CT.asleep && k !== 'wake') { toast('THE TV IS OFF · PRESS ON'); return false; } return true; },
+  gate(k) {
+    if (CT.asleep && k !== 'wake') { toast('THE TV IS OFF · PRESS ON'); return false; }
+    if (CT.locked && !CT.FREE[k]) { CT.nudge(); return false; }
+    return true;
+  },
+  nudge() { toast('LOCKED · HOLD THE LOCK TO OPEN'); },
+  lock(on) {
+    if (on && CT.asleep) { toast('THE TV IS OFF · PRESS ON'); return; }
+    CT.locked = !!on; body.classList.toggle('locked', CT.locked);
+    if (CT.locked) {
+      store.set('hub.lock', 1);
+      if (YT.open) YT.menu(false);
+      YTS.close();
+      const t = $('c-typer'); if (t) { t.hidden = true; $('c-ti').blur(); }
+    } else store.del('hub.lock');
+    const k = doc.querySelector('.kp[data-k=lock]');
+    k.querySelector('.i').innerHTML = CT.ic[CT.locked ? 'shut' : 'open'];
+    k.querySelector('.cap').textContent = CT.locked ? 'HOLD TO OPEN' : 'LOCK';
+    k.classList.toggle('lit', CT.locked);
+  },
   send(k, n) {
     if (!CT.gate(k)) return false;
     if (CT.lane && k !== 'home') {   // the lane has no Home: HUB is the stick's
@@ -1892,7 +1939,18 @@ const CT = {
   power(awake, mine) {
     if (mine) { CT.powerAt = Date.now(); CT.syncPower(); }
     if (CT.asleep === !awake) return;
-    CT.asleep = !awake; body.classList.toggle('asleep', CT.asleep); CT.status();
+    CT.asleep = !awake; body.classList.toggle('asleep', CT.asleep);
+    if (CT.asleep) CT.lock(false);
+    CT.meteor(); CT.status();
+  },
+  meteor() {   // now and then a star falls across the sleeping screen (one small element, transform and opacity only)
+    clearTimeout(CT.tMet);
+    if (!CT.asleep) return;
+    CT.tMet = setTimeout(() => {
+      const at = `translate(${rnd(5, 65).toFixed(1)}vw,${rnd(4, 45).toFixed(1)}vh) rotate(${rnd(14, 34).toFixed(0)}deg)`;
+      if (!doc.hidden) $('meteor').animate([{ transform: at, opacity: 0 }, { opacity: .85, offset: .25 }, { transform: at + ' translateX(30vw)', opacity: 0 }], { duration: 1300, easing: 'ease-in' });
+      CT.meteor();
+    }, rnd(25e3, 70e3));
   },
   // what is on the TV is written in the clock (under the date); the volume in its own pod; a key problem under that
   status() {
@@ -1923,14 +1981,21 @@ const CT = {
       mute: SV(SPK + '<path d="M30 19l10 10M40 19 30 29"/>'),
       voldn: SV(SPK + '<path d="M29 24h11"/>'),
       volup: SV(SPK + '<path d="M29 24h11M34.5 18.5v11"/>'),
+      open: SV('<rect class="f2" x="11" y="22" width="26" height="19" rx="4"/><path d="M16 22v-6.5a8 8 0 0 1 15.4-3"/>'),
+      shut: SV('<rect class="f2" x="11" y="22" width="26" height="19" rx="4"/><path d="M16 22v-6.5a8 8 0 0 1 16 0V22"/>'),
     };
     const shell = '<span class="g"></span><span class="o"></span><span class="r"></span><span class="fc"></span>';
     const box = doc.createElement('div'); box.id = 'keys'; box.setAttribute('aria-label', 'Remote');
     box.innerHTML = CT.KEYS.map(d => d.v   // the volume's number is the mute key too (his 10-30: 2 in 1)
-      ? `<button type="button" class="kp kv" id="kv" data-k="${d.k}" aria-label="Volume. Press to mute">${shell}<span class="i">${ic.mute}<b id="kv-n">—</b></span><b class="cap" id="kv-c">VOL</b></button>`
-      : `<button type="button" class="kp${d.m ? ' m' : ''}" data-k="${d.k}"${d.rep ? ' data-rep' : ''} aria-label="${d.l}">${shell}<span class="i">${ic[d.ic]}</span>${d.m ? '' : `<b class="cap">${d.l}</b>`}</button>`).join('');
+      ? `<button type="button" class="kp kv free" id="kv" data-k="${d.k}" aria-label="Volume. Press to mute">${shell}<span class="i">${ic.mute}<b id="kv-n">—</b></span><b class="cap" id="kv-c">VOL</b></button>`
+      : `<button type="button" class="kp${d.m ? ' m' : ''}${CT.FREE[d.k] || d.k === 'lock' ? ' free' : ''}" data-k="${d.k}"${d.rep ? ' data-rep' : ''} aria-label="${d.l}">${shell}<span class="i">${ic[d.ic]}</span>${d.m ? '' : `<b class="cap">${d.l}</b>`}</button>`).join('');
     body.insertBefore(box, $('top'));
-    box.querySelectorAll('button[data-k]').forEach(CT.bindKey);
+    box.querySelectorAll('button[data-k]').forEach(el => (el.dataset.k === 'lock' ? CT.bindLock : CT.bindKey)(el));
+    const sky = doc.createElement('div'); sky.id = 'night'; sky.setAttribute('aria-hidden', 'true');   // the sleeping TV's sky: its stars painted once
+    const stars = (n, tone) => Array.from({ length: n }, () => `${rnd(0, 100).toFixed(2)}vw ${rnd(0, 100).toFixed(2)}vh 0 ${Math.random() < .2 ? 1 : .35}px rgba(${tone},${rnd(.35, .95).toFixed(2)})`).join(',');
+    sky.innerHTML = `<i class="st" style="box-shadow:${stars(130, '226,232,255')}"></i><i class="st tw" style="box-shadow:${stars(45, '255,233,176')}"></i><i id="meteor"></i>`;
+    body.insertBefore(sky, $('forge'));
+    const shade = doc.createElement('div'); shade.id = 'shade'; shade.setAttribute('aria-hidden', 'true'); body.appendChild(shade);
     // what is on the TV, in the clock under the date
     const now = doc.createElement('div'); now.className = 'date'; now.id = 'c-on';
     now.innerHTML = '<i id="c-link"></i><span id="c-now">LINKING…</span><em id="c-chip" hidden></em>';
@@ -1990,6 +2055,23 @@ const CT = {
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, stop));
   },
 
+  bindLock(el) {   // a touch locks; opening takes 2 s on the key (it fills), so no brush of a hand ends it
+    const fill = doc.createElement('span'); fill.className = 'h'; el.insertBefore(fill, el.querySelector('.i'));
+    let t = 0;
+    const stop = () => { clearTimeout(t); el.classList.remove('hold', 'down'); };
+    el.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
+      el.classList.add('down');
+      if (!CT.locked) { CT.lock(true); return; }
+      el.classList.add('hold');
+      t = setTimeout(() => { stop(); CT.lock(false); toast('UNLOCKED'); }, 2000);
+    });
+    el.addEventListener('pointerup', () => { if (el.classList.contains('hold')) CT.nudge(); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, stop));
+  },
+
   // ---- the clock is the arrows and OK ----
   pad(r) {
     const STEP = 64;   // a swipe: one arrow per 64 px along its way
@@ -2002,7 +2084,7 @@ const CT = {
     };
     r.addEventListener('pointerdown', e => {
       if (e.button > 0 || P0.id !== null) return;
-      const z = zone(e.clientX, e.clientY); if (!z) return;
+      const z = zone(e.clientX, e.clientY); if (!z) { if (CT.locked) CT.nudge(); return; }
       e.preventDefault();
       try { r.setPointerCapture(e.pointerId); } catch (x) { /* a synthetic pointer */ }
       Object.assign(P0, { id: e.pointerId, x: e.clientX, y: e.clientY, ax: 0, ay: 0, zone: z, moved: false, n: 0 });
@@ -2102,7 +2184,7 @@ const CT = {
   },
 };
 Object.assign(window.hub, { ytsDone: (n, j) => YTS.done(n, j),
-  ctl: () => ({ asleep: CT.asleep, front: CT.front, vol: CT.vol, link: CT.link, adb: CT.adb, yt: YT.k, ytFull: YT.full, dimmed: CT.dimmed, apps: APPS.list.length }) });
+  ctl: () => ({ asleep: CT.asleep, front: CT.front, vol: CT.vol, link: CT.link, adb: CT.adb, yt: YT.k, ytFull: YT.full, dimmed: CT.dimmed, apps: APPS.list.length, locked: CT.locked }) });
 
 // ---- start ----
 if (APP0) body.classList.add('app');   // the app's "reduce motion" is Android's, not his: the HUB keeps moving (the controller too)
