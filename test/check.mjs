@@ -469,7 +469,8 @@ try {
     ok(!hits2.length, `tv layout: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
     ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
-    ok((await page.$$eval('#yt-ch .ch', c => c.length)) === 13, "twelve channels (10-30: CBS and Canal 5 out, ABC7 LA and Noticias Telemundo in) and the YouTube app in the tile");
+    ok((await page.$$eval('#c-chs .cc', c => c.length)) === 12, 'twelve channels in the sheet (10-30: CBS and Canal 5 out, ABC7 LA and Noticias Telemundo in)');
+    ok(await page.evaluate(() => [...document.getElementById('yt-ch').children].map(b => b.id).join() === 'yt-go,yt-app' && document.getElementById('c-chs').hidden), 'under the tile only CHANNELS and the YouTube app; no channel names (his 10-30), the sheet closed');
     const touched = await page.evaluate(async () => {   // the Pit's poll every minute: with nothing new it must touch nothing
       hub.renderPods(); let n = 0; const mo = new MutationObserver(l => { n += l.length; });
       document.querySelectorAll('.pod, .label').forEach(e => mo.observe(e, { subtree: true, childList: true, attributes: true, characterData: true }));
@@ -511,13 +512,27 @@ try {
     ok((await page.evaluate(() => window.__calls)).includes('open:1'), 'Select: the Pit opens in the app');
     // YouTube
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
-    const ch = await curName();
-    ok(await page.$eval('.cur', e => e.classList.contains('ch')), `Right, Right: into the YouTube channels (${ch})`);
+    ok(await cur('#yt-go'), 'Right, Right: CHANNELS');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+    ok(await page.evaluate(() => { const m = document.getElementById('c-chs'), r = m.getBoundingClientRect(), b = document.getElementById('bottom').getBoundingClientRect(), c = m.querySelector('.c-scroll'); return !m.hidden && m.querySelectorAll('h3').length >= 3 && Math.abs(r.left - b.left) < 2 && Math.abs(r.top - b.top) < 2 && r.bottom <= innerHeight && c.scrollHeight <= c.clientHeight + 1; }), 'Select: the sheet of channels, by group, over the panel, every card in sight with no scrolling');
+    await shot(page, 'tv-channels');
+    ok(await page.$eval('.cur', e => e === document.querySelector('#c-chs .cc')), 'the ring on the first channel');
+    const walked = [await page.$eval('.cur', e => e.dataset.k)];
+    for (const k of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowDown']) { await page.keyboard.press(k); walked.push(await page.$eval('.cur', e => e.dataset.k)); }
+    ok(walked.every(k => k) && new Set(walked).size === 5, `the arrows walk the cards (${walked.join(' ')})`);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    ok(await page.evaluate(() => document.getElementById('c-chs').hidden) && await cur('#yt-go'), 'Back closes the sheet, the ring on CHANNELS');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(100);
     await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    ok(await page.evaluate(() => document.getElementById('c-chs').hidden), 'Select on a channel closes the sheet');
+    ok(await cur('#yt-scr'), 'the ring on the picture, so Select is full screen');
     const src = await page.$eval('#yt-scr iframe', f => f.src).catch(() => '');
     ok(/^https:\/\/www\.youtube\.com\/embed\/.+autoplay=1.+origin=/.test(src) && !/mute=1/.test(src), 'Select plays the channel in the tile, with sound');
     ok(await page.evaluate(() => document.body.classList.contains('yt-on') && getComputedStyle(document.querySelector('.r-ticks')).animationPlayState === 'paused'), 'while it plays, the room holds still');
-    ok(await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on') && getComputedStyle(e, '::before').content.includes('■')), 'the playing channel shows a stop square');
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    ok(await page.$eval('.cur', e => e.classList.contains('cc') && e.classList.contains('on') && getComputedStyle(e.querySelector('b'), '::before').content.includes('▶')), 'CHANNELS again: the ring on the one playing, marked');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    ok(!!(await page.$('#yt-scr iframe')) && await cur('#yt-go'), 'Back on the sheet: it keeps playing, the ring on CHANNELS');
     await page.keyboard.press('ArrowUp');
     ok(await cur('#yt-scr') && /FULL SCREEN · BACK: STOP/.test(await page.$eval('#yt-scr', e => getComputedStyle(e, '::after').content)), 'Up while it plays: the picture, which says what Select and Back do');
     await page.keyboard.press('Enter');
@@ -532,27 +547,24 @@ try {
     ok(await page.waitForFunction(() => /calc/.test(document.querySelector('#yt-scr iframe').style.width), null, { timeout: 2000 }).then(() => true, () => false), 'leaving full screen nudges the frame (the stick\'s video misses the change otherwise: "cropped and zoomed in")');
     ok(await page.waitForFunction(() => document.querySelector('#yt-scr iframe').style.width === '', null, { timeout: 2000 }).then(() => true, () => false), 'and puts it back');
     await page.keyboard.press('ArrowDown');
-    ok(await page.$eval('.cur', e => e.classList.contains('ch') && e.classList.contains('on')), 'Down from the picture: the playing channel');
+    ok(await cur('#yt-go'), 'Down from the picture: CHANNELS');
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Escape');
     ok(!(await page.$('#yt-scr iframe')) && await page.evaluate(() => !document.body.classList.contains('yt-on') && getComputedStyle(document.querySelector('.r-ticks')).animationPlayState === 'running'), 'Back again: it stops, the room moves again');
-    ok(await page.$eval('.cur', (e, k) => e.classList.contains('ch') && e.dataset.k === k, next), 'the ring lands on the channel that was on');
+    ok(await cur('#yt-go'), 'the ring lands on CHANNELS');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    await page.evaluate(k => document.querySelector(`#c-chs .cc[data-k="${k}"]`).click(), next); await page.waitForTimeout(200);
+    ok(!!(await page.$('#yt-scr iframe')), 'a channel from the sheet plays again');
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
     await page.keyboard.press('Enter'); await page.waitForTimeout(200);
-    ok(!!(await page.$('#yt-scr iframe')), 'Select plays it again');
-    await page.keyboard.press('Enter'); await page.waitForTimeout(200);
-    ok(!(await page.$('#yt-scr iframe')) && await page.$eval('.cur', e => e.classList.contains('ch') && !e.classList.contains('on')), 'Select on the playing channel stops it: a channel is a switch');
-    // the row scrolls: the ring walks it in order and only ever lands on a chip in sight (10-29: it vanished onto chips scrolled away)
-    const inSight = () => page.evaluate(() => { const b = document.getElementById('yt-ch').getBoundingClientRect(), r = document.querySelector('.cur').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; });
-    const onlyInSight = () => page.evaluate(() => { const b = document.getElementById('yt-ch').getBoundingClientRect(); return hub.tv().TV.targets().filter(e => e.classList.contains('ch')).every(e => { const r = e.getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; }); });
-    for (let i = 0; i < 14; i++) await page.keyboard.press('ArrowRight');
-    ok(await page.$eval('.cur', e => e.dataset.k === 'app') && await inSight() && await onlyInSight(), 'Right along the row: it scrolls to the last chip (the YouTube app), in sight; no target is out of sight');
-    for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowLeft');
-    ok(await page.$eval('.cur', e => e === document.querySelector('#yt-ch .ch')) && await inSight() && await onlyInSight(), 'Left along the row: back to the first channel, in sight');
-    await page.keyboard.press('ArrowLeft');
-    ok(await page.$eval('.cur', e => !e.classList.contains('ch')), 'Left of the first channel: out of the row');
+    ok(!(await page.$('#yt-scr iframe')) && await cur('#yt-go'), 'Select on the playing channel stops it: a channel is a switch');
+    await page.evaluate(() => hub.tv().YT.menu(true)); await page.evaluate(() => hub.tv().YT.pick('cnn')); await page.waitForTimeout(200);
+    ok(await page.evaluate(() => document.getElementById('c-chs').hidden && !!document.querySelector('#yt-scr iframe')), 'a channel sent from the tablet closes a sheet left open on the TV');
+    await page.evaluate(() => hub.tv().YT.stop());
     await page.keyboard.press('ArrowRight');
-    ok(await page.$eval('.cur', e => e.classList.contains('ch')) && await inSight(), 'Right: back into the row, on a chip in sight');
-    await page.evaluate(() => { const r = document.querySelector('#yt-ch .ch'); hub.tv().TV.ring(r); });
+    ok(await cur('#yt-app'), 'Right of CHANNELS: the YouTube app');
+    await page.keyboard.press('ArrowLeft');
+    ok(await cur('#yt-go'), 'and back');
     // the news, in his order; and the list survives a layout made while it could not be measured (the stick, behind Netflix)
     await page.evaluate(() => { const b = document.getElementById('news-l'); b.style.height = '10px'; window.dispatchEvent(new Event('resize')); });
     await page.waitForTimeout(400);
@@ -562,7 +574,7 @@ try {
     const first = await page.$eval('.nw small', e => e.textContent);
     ok(/^FOX (US|POLITICS)/.test(first), `the news starts with a US story (${first})`);
     await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
-    ok(await page.$eval('.cur', e => e.id === 'yts-q') && await page.evaluate(() => document.activeElement.id !== 'yts-q'), 'Down from the channels: the YouTube search, and no keyboard yet (only Select brings it)');
+    ok(await page.$eval('.cur', e => e.id === 'yts-q') && await page.evaluate(() => document.activeElement.id !== 'yts-q'), 'Down from CHANNELS: the YouTube search, and no keyboard yet (only Select brings it)');
     await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
     ok(await page.$eval('.cur', e => e.classList.contains('nw')), 'Down again: the news');
     await page.keyboard.press('Enter'); await page.waitForTimeout(400);

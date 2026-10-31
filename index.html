@@ -141,8 +141,7 @@ body.forge .runner i{background:radial-gradient(circle,#FFF0D0 0 22%,rgba(255,10
 .pod{position:absolute;pointer-events:auto;cursor:pointer;outline:none;transition:transform .14s ease,opacity 1.2s ease}
 /* a remote (the Fire TV Stick, 10-29): the arrows move a gold ring, the cursor (.cur); a keyboard's focus wears the same; a finger never sees either */
 .pod:focus-visible::after,.pod.cur::after{content:'';position:absolute;inset:-9%;border-radius:50%;box-shadow:0 0 0 3px var(--gold-hot),0 0 28px rgba(255,181,71,.75);pointer-events:none}
-#gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur,.ch.cur,.nw.cur{outline:2px solid var(--gold-hot);outline-offset:4px}
-.ch.cur{outline-offset:1px}
+#gear:focus-visible,#sheet button:focus-visible,#gear.cur,.chip.cur,#sheet .cur,.nw.cur{outline:2px solid var(--gold-hot);outline-offset:4px}
 #clock.cur .time{text-shadow:0 0 14px var(--gold-hot),0 0 44px var(--gold)}
 .tv *:focus{outline:none}
 /* the stick's layer diet (10-29, measured: every composited layer costs its chip per frame; 63 layers = 1.9 cores): on a TV the 1-px
@@ -181,10 +180,7 @@ body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 #yt-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center}
 #yt-idle b{font-family:var(--word);font-weight:400;font-size:28px;letter-spacing:.14em;color:var(--gold-hot)}
 #yt-idle span{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim)}
-#yt-ch{display:flex;gap:8px;margin-top:5px;padding:4px;overflow:hidden}
-.ch{flex:none;padding:7px 11px;border-radius:6px;border:1px solid rgba(255,181,71,.28);background:none;font:500 10.5px var(--mono);letter-spacing:.14em;color:var(--dim);white-space:nowrap}
-.ch.on{color:var(--gold-hot);border-color:var(--gold)}
-.ch.on::before{content:'■ '}
+#yt-ch{display:flex;gap:8px;margin-top:10px}
 body.tv #yt-scr.cur{outline:2px solid var(--gold-hot);outline-offset:3px}
 /* the stick: Amazon's WebView puts the video in its own layer under the page and cuts a hole for it, and it cannot cut a
    rounded one: a rounded clip turned every channel black in the tile, full screen (square) played (measured 10-29) */
@@ -402,7 +398,7 @@ body.ctl #c-tv{display:block}
 body.ctl #c-kb{display:flex}
 body.ctl #c-kb .cb{flex:1;height:44px}
 body.ctl #yts{display:block}
-body.ctl .cb.wide{flex:1}
+.cb.wide{flex:1}
 body.ctl .cb{height:44px}
 body.ctl #yts-q{height:44px}
 #c-tv-now.on{color:var(--gold-hot)}
@@ -441,6 +437,8 @@ body.ctl.yts-on #yts-l{display:flex}
 .cc.on{border-color:var(--gold-hot);box-shadow:0 0 0 1px var(--gold-hot),0 0 18px rgba(255,181,71,.3)}
 .cc.on b{color:var(--gold-hot)}
 .cc.on b::before{content:'▶ '}
+.cc.cur{border-color:var(--gold-hot);box-shadow:0 0 0 2px var(--gold-hot),0 0 22px rgba(255,181,71,.5)}
+body.tv:not(.ctl) .cc small{font-size:10.5px}
 /* the TV asleep: only ON is lit */
 body.asleep #reactor,body.asleep #pods,body.asleep .label,body.asleep #apps,body.asleep #bottom,body.asleep .kp:not([data-k=wake]){opacity:.28}
 body.asleep .kp[data-k=wake] .g{background:radial-gradient(circle,rgba(255,214,140,.5) 0%,rgba(255,181,71,.16) 42%,transparent 68%)}
@@ -638,7 +636,7 @@ function layout(force) {
   st.setProperty('--R', R.toFixed(1) + 'px'); st.setProperty('--rp', rp.toFixed(1) + 'px');
   st.setProperty('--bgY', (cy / H * 100).toFixed(1) + '%');
   if (land) { st.setProperty('--colL', (cx + R * .9) + 'px'); st.setProperty('--colW', Math.max(170, W - (cx + Ro + rp + 200)) + 'px'); }
-  if (land && S.tv) st.setProperty('--tvL', (cx + Ro + rp + 16 + 210 + 18).toFixed(1) + 'px');
+  if (land && S.tv) { st.setProperty('--tvL', (cx + Ro + rp + 16 + 210 + 18).toFixed(1) + 'px'); st.setProperty('--pT', '104px'); }
   if (CTL) { st.setProperty('--tvL', (land ? cx + Ro + rp + 44 : 22).toFixed(1) + 'px'); st.setProperty('--pT', Math.round(land ? 108 : cy + Ro + rp + 40) + 'px'); }
   const r = $('reactor'); Object.assign(r.style, { left: cx - R + 'px', top: cy - R + 'px', width: 2 * R + 'px', height: 2 * R + 'px' });
   const o = $('orbit'); Object.assign(o.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
@@ -1517,15 +1515,27 @@ function placeApps() {
 // ---- YouTube on a TV: the Lounge's channels in a tile; Select plays, Select again fills the screen, Back steps back; search is the YouTube app ----
 const YT = {
   k: null, c: null, full: false,
-  build() {
-    const box = $('yt-ch'); box.innerHTML = '';
-    LOUNGE.TV.forEach(c => {
-      const b = doc.createElement('button'); b.type = 'button'; b.className = 'ch'; b.dataset.k = c.k; b.textContent = c.short.toUpperCase();
-      b.addEventListener('click', () => YT.pick(c.k)); box.appendChild(b);
-    });
-    const y = doc.createElement('button'); y.type = 'button'; y.className = 'ch'; y.dataset.k = 'app'; y.textContent = 'YOUTUBE APP ▸';
-    y.addEventListener('click', () => { YT.stop(); launchApp('com.amazon.firetv.youtube'); }); box.appendChild(y);
+  open: false,
+  build() {   // CHANNELS opens the Lounge's groups over the panel: one sheet for the TV and the tablet (his 10-30: "take out the name of the channels, put the sub menu like the remote")
+    const groups = [];
+    LOUNGE.TV.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, list: [] }); g.list.push(c); });
+    const menu = doc.createElement('div'); menu.id = 'c-chs'; menu.className = 'c-sheet'; menu.hidden = true;
+    menu.innerHTML = `<div class="cs-h"><b>${CTL ? 'CHANNELS · PLAY ON THE TV' : 'CHANNELS'}</b><button type="button" class="cb x" id="c-chs-x">CLOSE</button></div><div class="c-scroll">`
+      + groups.map(g => `<h3>${esc(g.name.toUpperCase())}</h3><div class="c-grid">` + g.list.map(c => `<button type="button" class="cc" data-k="${c.k}"><b>${esc(c.short.toUpperCase())}</b><small>${esc(c.note.toUpperCase())}</small></button>`).join('') + '</div>').join('')
+      + '</div>';
+    body.appendChild(menu);
+    menu.querySelectorAll('.cc').forEach(b => b.addEventListener('click', () => { YT.pick(b.dataset.k); if (YT.open) YT.menu(false); if (!CTL && YT.playing()) TV.ring($('yt-scr')); }));
+    $('c-chs-x').addEventListener('click', () => YT.menu(false));
+    $('yt-ch').innerHTML = '<button type="button" class="cb wide" id="yt-go">CHANNELS <i>▾</i></button><button type="button" class="cb" id="yt-app">YOUTUBE APP ▸</button>';
+    $('yt-go').addEventListener('click', () => YT.menu(true));
+    $('yt-app').addEventListener('click', () => { YT.stop(); launchApp('com.amazon.firetv.youtube'); });
     YT.paint();
+  },
+  menu(on) {
+    YT.open = !!on; $('c-chs').hidden = !on;
+    const b = $(CTL ? 'c-tv-pick' : 'yt-go'); if (b) b.classList.toggle('on', YT.open);
+    if (on) YTS.close();
+    if (!CTL) TV.ring(on ? doc.querySelector('#c-chs .cc.on') || doc.querySelector('#c-chs .cc') : $('yt-go'));
   },
   src(c) {
     return 'https://www.youtube.com/embed/' + (c.vid ? c.vid + '?' : 'live_stream?channel=' + c.ch + '&') + 'autoplay=1&playsinline=1&rel=0&enablejsapi=1'
@@ -1536,7 +1546,7 @@ const YT = {
     if (YT.k === k && YT.playing()) { YT.stop(); return; }   // a channel is a switch: Select again stops it (his 10-29: "no way to stop it")
     const c = LOUNGE.TV.find(x => x.k === k); if (c) YT.play(c);
   },
-  playVid(vid, t) {   // a video the search found (10-30): the same tile and keys; not a channel, so no chip lights
+  playVid(vid, t) {   // a video the search found (10-30): the same tile and keys; not a channel, so no card lights
     if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) return;
     const name = String(t || 'YouTube').slice(0, 160);
     YT.play({ k: 'v-' + vid, vid, name, short: name.length > 46 ? name.slice(0, 45) + '…' : name });
@@ -1544,6 +1554,7 @@ const YT = {
   play(c) {
     const pic = TV.cur === $('yt-scr');
     YT.stop();
+    if (YT.open) YT.menu(false);                               // the tablet can change the channel with the sheet open on the TV
     const f = doc.createElement('iframe'); f.title = c.name;
     f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     f.referrerPolicy = 'strict-origin-when-cross-origin';   // YouTube refuses embeds that do not say which site they are on (the Lounge's lesson)
@@ -1552,9 +1563,9 @@ const YT = {
     if (pic) TV.ring($('yt-scr'));                             // a channel changed from the picture: the ring stays on it
   },
   stop() {
-    const f = $('yt-scr').querySelector('iframe'), was = YT.k, pic = TV.cur === $('yt-scr');
+    const f = $('yt-scr').querySelector('iframe'), pic = TV.cur === $('yt-scr');
     if (f) f.remove(); YT.setFull(false); YT.k = null; YT.c = null; YT.paint();
-    if (pic) TV.ring(doc.querySelector(`#yt-ch .ch[data-k="${was}"]`));   // the picture is gone: the ring goes to the channel that was on
+    if (pic) TV.ring($('yt-go'));                              // the picture is gone: the ring goes to CHANNELS
   },
   setFull(on) { YT.full = !!on && YT.playing(); $('yt').classList.toggle('full', YT.full); body.classList.toggle('yt-full', YT.full); YT.nudge(); },
   // the tablet's FULL SCREEN and SMALL reach the page through the stick's activity, which pauses and resumes it, and the video
@@ -1572,7 +1583,7 @@ const YT = {
   paint(hint) {
     const c = YT.c;
     body.classList.toggle('yt-on', YT.playing());
-    doc.querySelectorAll('#yt-ch .ch').forEach(b => b.classList.toggle('on', b.dataset.k === YT.k));
+    doc.querySelectorAll('#c-chs .cc').forEach(b => b.classList.toggle('on', b.dataset.k === YT.k));
     $('yt-idle').hidden = YT.playing();
     $('yt-name').textContent = c ? c.short.toUpperCase() : 'YOUTUBE';
     $('yt-hint').textContent = hint || 'PICK A CHANNEL BELOW · SELECT IT AGAIN TO STOP';
@@ -1621,7 +1632,7 @@ const YTS = {
       box.appendChild(b);
     });
     YTS.open = true; $('yts-l').hidden = false; body.classList.add('yts-on');
-    if (CTL) CT.menu(false);
+    if (YT.open) YT.menu(false);
     else if (S.tv) TV.ring(box.querySelector('.ysr') || $('yts-x'));
   },
   close() {
@@ -1672,21 +1683,20 @@ doc.addEventListener('visibilitychange', () => { if (!doc.hidden) fitNews(); });
 
 // ---- a remote (the Fire TV Stick, 10-29): the arrows move a gold ring by direction, Select presses, the clock is the timer ----
 // The app says `tv` in its services and hands the stick's arrows and Select to this page as ArrowLeft/Right/Up/Down and Enter.
-// The ring walks the apps (Up/Down along their ring), the clock, the pods, the link chip, the YouTube channels, the news and the
-// gear; inside a sheet, that sheet's buttons and fields. The channels are a row that scrolls: the ring lands only on the ones
-// in sight, and Left/Right walk it. While one plays, Up is the picture: Select is full screen, Back stops it.
+// The ring walks the apps (Up/Down along their ring), the clock, the pods, the link chip, CHANNELS, the search, the news and the
+// gear; inside a sheet, that sheet's buttons and fields; CHANNELS opens theirs and Back closes it. While one plays, Up from
+// CHANNELS is the picture: Select is full screen, Back stops it.
 // YouTube full screen: Left/Right change the channel, Select or Back leave it.
 const TV = {
   cur: null, back: null,
   targets() {
     const shown = e => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
     if (S.sheet) return [...$('sheet').querySelectorAll('button:not([disabled]),input')].filter(shown);
+    if (YT.open) return [...doc.querySelectorAll('#c-chs .cc'), $('c-chs-x')];
     const nl = $('news-l').getBoundingClientRect();
     const rows = [...doc.querySelectorAll('.nw')].filter(e => !e.hidden && e.getBoundingClientRect().bottom <= nl.bottom + 1);   // only rows that fit
-    const cb = $('yt-ch').getBoundingClientRect();   // the row scrolls: a chip scrolled out of sight is no target (10-29: the ring vanished onto one)
-    const chips = [...doc.querySelectorAll('#yt-ch .ch')].filter(e => { const r = e.getBoundingClientRect(); return r.left >= cb.left - 1 && r.right <= cb.right + 1; });
     return [...doc.querySelectorAll('.tapp'), ...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'),
-      YT.playing() ? $('yt-scr') : null, ...chips, $('yts-q'), $('yts-go'),
+      YT.playing() ? $('yt-scr') : null, $('yt-go'), $('yt-app'), $('yts-q'), $('yts-go'),
       ...(YTS.open ? [...doc.querySelectorAll('#yts-rows .ysr'), $('yts-x')] : [...rows, $('news-r')]), $('gear')].filter(shown);
   },
   ring(el) {
@@ -1696,8 +1706,7 @@ const TV = {
     body.classList.toggle('tv-app', app); $('appname').textContent = app ? el.dataset.name.toUpperCase() : '';
     if (!el) return;
     el.classList.add('cur');
-    if (el.classList.contains('ch')) { const box = $('yt-ch'), r = el.offsetLeft + el.offsetWidth / 2 - box.clientWidth / 2; box.scrollLeft = Math.max(0, r); }
-    if (el.classList.contains('ysr')) el.scrollIntoView({ block: 'nearest' });
+    if (el.classList.contains('ysr') || el.classList.contains('cc')) el.scrollIntoView({ block: 'nearest' });
     if (el.tagName === 'INPUT' && S.sheet) el.focus();   // the search field takes the keyboard only on Select (a ring passing over it must not pop it)
     else if (doc.activeElement && doc.activeElement.tagName === 'INPUT' && doc.activeElement !== el) doc.activeElement.blur();
   },
@@ -1713,13 +1722,12 @@ const TV = {
       if (dy) { const n = apps[i + (dy > 0 ? 1 : -1)]; if (n) TV.ring(n); return; }
       if (dx < 0) return;
     }
-    if (TV.cur.classList.contains('ch') && dx) {   // the channels: Left/Right walk the row in order and it scrolls; the first one's Left leaves it
-      const row = [...doc.querySelectorAll('#yt-ch .ch')], n = row[row.indexOf(TV.cur) + dx];
+    if (TV.cur.parentNode === $('yt-ch') && dx) {   // CHANNELS and the app: Left/Right stay in the row (the search's middle sits nearer than the app's)
+      const n = dx > 0 ? TV.cur.nextElementSibling : TV.cur.previousElementSibling;
       if (n) { TV.ring(n); return; }
-      if (dx > 0) return;
     }
-    if (TV.cur.classList.contains('ch') && dy < 0 && YT.playing()) { TV.ring($('yt-scr')); return; }   // the picture is big: by its middle it loses to the link chip
-    if (TV.cur === $('yt-scr') && dy > 0) { TV.ring(doc.querySelector('#yt-ch .ch.on') || doc.querySelector('#yt-ch .ch')); return; }
+    if (TV.cur.parentNode === $('yt-ch') && dy < 0 && YT.playing()) { TV.ring($('yt-scr')); return; }   // the picture is big: by its middle it loses to the link chip
+    if (TV.cur === $('yt-scr') && dy > 0) { TV.ring($('yt-go')); return; }
     const fromApp = TV.cur.classList.contains('tapp');
     const c = TV.mid(TV.cur); let best = null, score = Infinity;
     for (const e of t) {
@@ -1761,6 +1769,7 @@ doc.addEventListener('keydown', e => {   // capture: it sees a sheet before the 
   if (d) { e.preventDefault(); TV.move(d[0], d[1]); }
   else if (e.key === 'Enter') { if (e.target && e.target.tagName === 'INPUT') return; e.preventDefault(); TV.press(); }
   else if (e.key === 'Escape') {   // a sheet: its own Escape closes it
+    if (!S.sheet && YT.open) { YT.menu(false); return; }      // Back on the channels: the ring on CHANNELS, what plays keeps playing
     if (!S.sheet && YTS.open) { YTS.close(); TV.ring($('yts-q')); return; }   // Back on the results: the news again
     if (!S.sheet && YT.playing()) YT.stop(); TV.settle(80);
   }
@@ -1939,16 +1948,7 @@ const CT = {
     tv.innerHTML = '<div class="cs-h"><b>LIVE TV</b><span id="c-tv-now">NOTHING ON</span></div>'
       + '<div class="cs-r"><button type="button" class="cb wide" id="c-tv-pick">CHANNELS <i>▾</i></button><button type="button" class="cb" id="c-tv-full">FULL SCREEN</button><button type="button" class="cb" id="c-tv-stop">STOP</button></div>';
     $('tvcol').insertBefore(tv, $('tvcol').firstChild);
-    const groups = [];
-    LOUNGE.TV.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, list: [] }); g.list.push(c); });
-    const menu = doc.createElement('div'); menu.id = 'c-chs'; menu.className = 'c-sheet'; menu.hidden = true;
-    menu.innerHTML = '<div class="cs-h"><b>CHANNELS · PLAY ON THE TV</b><button type="button" class="cb x" id="c-chs-x">CLOSE</button></div><div class="c-scroll">'
-      + groups.map(g => `<h3>${esc(g.name.toUpperCase())}</h3><div class="c-grid">` + g.list.map(c => `<button type="button" class="cc" data-k="${c.k}"><b>${esc(c.short.toUpperCase())}</b><small>${esc(c.note.toUpperCase())}</small></button>`).join('') + '</div>').join('')
-      + '</div>';
-    body.appendChild(menu);
-    menu.querySelectorAll('.cc').forEach(b => b.addEventListener('click', () => { YT.pick(b.dataset.k); CT.menu(false); }));
-    $('c-tv-pick').addEventListener('click', () => CT.menu(menu.hidden));
-    $('c-chs-x').addEventListener('click', () => CT.menu(false));
+    $('c-tv-pick').addEventListener('click', () => YT.menu(!YT.open));
     $('c-tv-full').addEventListener('click', () => { if (YT.k) YT.setFull(!YT.full); });
     $('c-tv-stop').addEventListener('click', () => YT.stop());
     $('yts-l').classList.add('c-sheet');   // the results open over the panel
@@ -1962,7 +1962,6 @@ const CT = {
   lightArc(d) {   // transform and opacity only
     const e = $('sec-' + d); if (e && e.animate) e.animate([{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: 0 }], { duration: 420, easing: 'ease-out' });
   },
-  menu(on) { $('c-chs').hidden = !on; $('c-tv-pick').classList.toggle('on', !!on); if (on) YTS.close(); },
   place() {   // the keys on their rings (layout() calls this with the geometry)
     const g = S.geo; if (!g || !g.ctl) return;
     doc.querySelectorAll('#keys .kp').forEach(el => {
