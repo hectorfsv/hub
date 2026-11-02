@@ -293,6 +293,9 @@ try {
     await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
     ok(/SMOKER ON/.test(await page.textContent('#ck-name')) && /^ON ·/.test(await page.textContent('#ck-phase')), 'a session reads SMOKER ON, never COOKING or Just watch');
     ok((await state(page)).forge && /RIBS/.test(await page.textContent('#ck-read')) && /160°/.test(await page.textContent('#ck-read')) && /195°/.test(await page.textContent('#ck-read')) && /PROBE 2/.test(await page.textContent('#ck-read')), 'it shows his named thermometer, his line, and the next one by its port');
+    pit.reading = [{ at: new Date(T0 - 30e3).toISOString(), pit: 251, setpoint: 250, probes: { m1: 130 } }];
+    await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
+    ok(/MEATER/.test(await page.textContent('#ck-read')), 'a Meater shows by name');
     pit.cooks = [{ ...pit.cooks[0], state: { ...pit.cooks[0].state, offSince: new Date(T0 - 60e3).toISOString() } }];
     pit.reading = [{ at: new Date(T0 - 30e3).toISOString(), pit: 180, power: false, setpoint: 250, probes: {} }];
     await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);

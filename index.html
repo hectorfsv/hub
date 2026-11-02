@@ -980,7 +980,7 @@ function shapeCook(row, rd) {
   for (const id of Object.keys((rd && rd.probes) || {}).sort()) {
     if (led.has(id) || temp(id) == null) continue;
     const mark = marks.find(m => m.pid === id);
-    meats.push({ name: names[id] || 'probe ' + id.replace(/\D/g, ''), t: temp(id), target: mark && !mark.down ? +mark.at : null });
+    meats.push({ name: names[id] || (id[0] === 'm' ? 'meater' : 'probe ' + id.replace(/\D/g, '')), t: temp(id), target: mark && !mark.down ? +mark.at : null });
   }
   const at = rd ? new Date(rd.at).getTime() : 0, age = Date.now() - at;
   // a session the smoker opened by itself (no plan, no words): it's on, it isn't cooking anything we know of

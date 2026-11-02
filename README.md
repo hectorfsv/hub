@@ -80,6 +80,10 @@ Back closes a sheet (the app sends Escape) and the ring returns to where it was.
 diet:** on a TV the 1-px scan line, the three orbit runners and 8 of the 14 motes stay out (`.tv` rules): on that chip
 every composited layer costs CPU every frame (measured 10-29, `projects/desk-tablet/README.md`); the tablet keeps them all.
 
+### The Pit on the HUB (11-02)
+
+`shapeCook` knows a session the smoker opened by itself (`state.auto`): the card reads SMOKER ON, every thermometer plugged in shows by his name or its port, and the fire goes out with the smoker (`state.offSince`), not when the session closes. The Pit's own TV screen is in `projects/the-pit/README.md`.
+
 ### The TV layout (10-29 night, his "Go and build the tv layout!")
 
 Only with the app's `tv` (the tablet is untouched): the reactor smaller and to the left; **his streaming apps as a ring
