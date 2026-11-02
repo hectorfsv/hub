@@ -969,13 +969,22 @@ async function pitGet(path) {
 }
 function shapeCook(row, rd) {
   const st = row.state || {}, plan = st.plan || {}, roles = Array.isArray(plan.probes) ? plan.probes : [], map = st.probes || {};
-  const tracks = plan.tracks || {}, phase = row.status === 'paused' ? 'paused' : st.phase || 'cook';
+  const tracks = plan.tracks || {}, phase = row.status === 'paused' ? 'paused' : st.phase || 'cook', names = st.names || {}, marks = st.marks || [];
+  const temp = id => { const t = rd && rd.probes ? rd.probes[id] : null; return typeof t === 'number' && t >= 1 && t <= 500 ? t : null; };
   const meats = roles.map(role => {
-    const id = map[role], t = rd && rd.probes ? rd.probes[id] : null, tr = tracks[role], until = tr && tr[0] && tr[0].until;
-    return { name: String(role).replace(/_/g, ' '), t: typeof t === 'number' && t >= 1 && t <= 500 ? t : null, target: until && until.at_least ? +until.at_least : null };
+    const id = map[role], tr = tracks[role], until = tr && tr[0] && tr[0].until;
+    return { name: names[id] || String(role).replace(/_/g, ' '), t: temp(id), target: until && until.at_least ? +until.at_least : null };
   });
+  // thermometers belong to the pit since 11-02: any other one plugged in shows too, by its name or its port, with his own "tell me at"
+  const led = new Set(roles.map(r => map[r]));
+  for (const id of Object.keys((rd && rd.probes) || {}).sort()) {
+    if (led.has(id) || temp(id) == null) continue;
+    const mark = marks.find(m => m.pid === id);
+    meats.push({ name: names[id] || 'probe ' + id.replace(/\D/g, ''), t: temp(id), target: mark && !mark.down ? +mark.at : null });
+  }
   const at = rd ? new Date(rd.at).getTime() : 0, age = Date.now() - at;
-  return { id: row.id, name: row.meat || plan.name || 'Cook', phase, phaseLabel: { cook: 'COOKING', rest: 'RESTING', hold: 'HOLDING', paused: 'PAUSED' }[phase] || String(phase).toUpperCase(),
+  // a session the smoker opened by itself (no plan, no words): it's on, it isn't cooking anything we know of
+  return { id: row.id, name: row.meat || (st.auto ? 'Smoker on' : plan.name) || 'Cook', phase, phaseLabel: st.auto ? 'ON' : { cook: 'COOKING', rest: 'RESTING', hold: 'HOLDING', paused: 'PAUSED' }[phase] || String(phase).toUpperCase(),
     started: new Date(row.started_at || st.startedAt || Date.now()).getTime(), pit: rd ? rd.pit : null, set: rd ? rd.setpoint : null,
     meat: meats.find(m => m.t != null) || meats[0] || null, meats, stale: !rd || age > 4 * MIN, staleMin: rd ? Math.round(age / MIN) : 0 };
 }
@@ -991,7 +1000,8 @@ async function pitPoll(force) {
     else if (!pitSession()) { S.pit = 'unlinked'; S.cook = null; }
     else try {
       const rows = await pitGet('cooks?status=in.(running,paused)&order=started_at.desc&limit=1&select=id,meat,status,state,started_at');
-      if (!rows.length) {
+      // a session closes 30 minutes after the smoker goes off; the fire on the HUB goes out with the smoker, not with the session
+      if (!rows.length || (rows[0].state && rows[0].state.auto && rows[0].state.offSince)) {
         S.cook = null; S.pit = 'idle';
         const last = await pitGet('readings?order=at.desc&limit=1&select=at,pit,power');
         S.idle = last[0] && Date.now() - new Date(last[0].at).getTime() < 10 * MIN ? last[0] : null;

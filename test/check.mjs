@@ -62,7 +62,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     const u = r.request().url();
     if (u.includes('/auth/v1/token')) { pit.token++; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'a' + pit.token, refresh_token: 'r' + pit.token, expires_in: 3600, user: { email: 'pit@test' } }) }); }
     if (u.includes('/rest/v1/cooks')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(pit.cooks) });
-    if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(READING) });
+    if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(pit.reading || READING) });
     return r.fulfill({ status: 404, body: '' });
   });
   await page.addInitScript(([app, linked, bat, tv, apps]) => {
@@ -287,6 +287,17 @@ try {
     ok((await state(page)).pit === 'idle' && /ON · PIT 251°/.test(await page.textContent('#st1')), 'no cook, a fresh reading: the Pit pod shows the smoker on at 251°');
     pit.cooks = COOK; await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
     ok((await state(page)).forge, 'a cook starts: the forge lights');
+    // a session the smoker opened by itself: no plan, no words, every thermometer plugged in
+    pit.cooks = [{ id: 's1', meat: null, status: 'running', started_at: new Date(T0 - 50 * 60e3).toISOString(), state: { phase: 'cook', auto: true, offSince: null, probes: {}, names: { p1: 'ribs' }, marks: [{ pid: 'p1', at: 195 }], plan: { name: 'Just watch', probes: [], tracks: { pit: [{ name: 'Watching' }] } } } }];
+    pit.reading = [{ at: new Date(T0 - 30e3).toISOString(), pit: 251, setpoint: 250, probes: { p0: -1, p1: 160.2, p2: 142 } }];
+    await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
+    ok(/SMOKER ON/.test(await page.textContent('#ck-name')) && /^ON ·/.test(await page.textContent('#ck-phase')), 'a session reads SMOKER ON, never COOKING or Just watch');
+    ok((await state(page)).forge && /RIBS/.test(await page.textContent('#ck-read')) && /160°/.test(await page.textContent('#ck-read')) && /195°/.test(await page.textContent('#ck-read')) && /PROBE 2/.test(await page.textContent('#ck-read')), 'it shows his named thermometer, his line, and the next one by its port');
+    pit.cooks = [{ ...pit.cooks[0], state: { ...pit.cooks[0].state, offSince: new Date(T0 - 60e3).toISOString() } }];
+    pit.reading = [{ at: new Date(T0 - 30e3).toISOString(), pit: 180, power: false, setpoint: 250, probes: {} }];
+    await page.evaluate(() => window.hub.refresh()); await page.waitForTimeout(1200);
+    ok(!(await state(page)).forge && /SMOKER OFF/.test(await page.textContent('#st1')), 'the smoker off: the fire goes out with it, the session or not');
+    pit.reading = null;
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     await ctx.close();
   }
