@@ -84,6 +84,15 @@ every composited layer costs CPU every frame (measured 10-29, `projects/desk-tab
 
 `shapeCook` knows a session the smoker opened by itself (`state.auto`): the card reads SMOKER ON, every thermometer plugged in shows by his name or its port, and the fire goes out with the smoker (`state.offSince`), not when the session closes. The Pit's own TV screen is in `projects/the-pit/README.md`.
 
+### Games and DirecTV (11-03, his "set the gaming ring on the big ones, between the pit and home assistant" and "set directv to play on the TV section")
+
+Only on the stick's own HUB (`S.tv`, not the controller): when the app's list holds RetroArch (`GAMES`: `com.retroarch.ra32` and its
+64-bit names), it leaves the apps ring and becomes a fourth pod, **Games**, drawn between the Pit and Home Assistant (`pos: 1.5`;
+slot `i: 3`, so the app's slots 0-2 keep their numbers). Its label says RETROARCH; Select launches it through `HubsApp.launch`
+(which only opens what its list holds). RetroArch uninstalled = the pod goes. The controller keeps RetroArch in its crown.
+**DIRECTV** (`com.att.tv`) is a third button under the tile, shown only when it is installed; it opens the DirecTV app full screen.
+Its picture cannot play in the tile: it is DRM-locked to its own player, unlike YouTube's embeds. It stays on the ring too.
+
 ### The TV layout (10-29 night, his "Go and build the tv layout!")
 
 Only with the app's `tv` (the tablet is untouched): the reactor smaller and to the left; **his streaming apps as a ring
@@ -103,7 +112,7 @@ an HTML line under the date (the stick misdraws the core's SVG text).
 ## Tests
 
 `node test/check.mjs` runs headless Chromium at the tablet's size (533×853 at 1.5×), landscape, an iPhone and a desktop.
-It has 232 checks (the TV view, the remote and the TV layout since 10-29; the tile's square corners and the keyboard taken back from the player since 10-29 late):
+It has 276 checks (the Games pod and DIRECTV since 11-03; the TV view, the remote and the TV layout since 10-29; the tile's square corners and the keyboard taken back from the player since 10-29 late):
 
 - the layout: nothing off screen or overlapping;
 - the boot check, the weather, the link flow, the forge, the app's calls, and night;
