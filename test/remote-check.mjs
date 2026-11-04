@@ -686,6 +686,7 @@ async function controller(view) {
     await sleep(2300);   // launch() keeps its lock until the page has been left for good
     await page.locator('.pod:not(.pit)').tap();
     ok(await until(page, () => /NOT SET UP/.test(document.getElementById('toast').textContent), 1500) && await page.evaluate(() => window.__open.length === 1), 'Home Assistant: not set up yet, nothing opens');
+    ok(await page.evaluate(() => { const R = document.getElementById('reactor').getBoundingClientRect(), b = document.querySelector('.kp[data-k="lock"]').getBoundingClientRect(); return b.bottom < R.top && Math.abs(b.left + b.width / 2 - (R.left + R.width / 2)) < 2; }), 'no RetroArch: LOCK on top, between the Pit and Home Assistant');
 
     // live TV: the channel picker (the Lounge's groups)
     ok(await page.evaluate(() => document.getElementById('c-tv-full').disabled && document.getElementById('c-tv-stop').disabled), 'nothing on: FULL SCREEN and STOP are off');
@@ -801,6 +802,41 @@ async function controller(view) {
     ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   } finally { await ctx.close(); }
 }
+// RetroArch on the stick (his 11-04, "change the icon and move the games ring"): out of the crown, the Games pod on top
+// between the Pit and Home Assistant, as on the TV; LOCK goes in, between ON and OFF
+async function controllerGames(view) {
+  const land = view === 'tablet-land';
+  console.log(`\n${engineName} controller (${land ? 'sideways' : 'upright'}) with RetroArch on the stick: the Games pod`);
+  mock.reset();
+  mock.apps.push({ pkg: 'com.retroarch.ra32', name: 'RetroArch', icon: mock.apps[0].icon });
+  const { ctx, page, errors } = await open(view, { at: '/hub', query: 'ctl&boot=0&dim=600000&k=' + TOKEN, app: true, lane: true });
+  try {
+    await page.evaluate(() => { window.__lane.state = 'ok'; });
+    ok(await until(page, () => window.hub && window.hub.ctl && window.hub.ctl().link === 'ok' && window.hub.ctl().apps > 0 && !document.getElementById('boot'), 8000), 'linked, the boot over');
+    ok(await page.evaluate(() => document.querySelectorAll('.pod').length === 3 && !document.querySelector('.tapp[data-pkg="com.retroarch.ra32"]')), 'a third pod, Games, and RetroArch out of the crown');
+    const gp = await page.evaluate(() => {
+      const at = e => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; };
+      const R = document.getElementById('reactor').getBoundingClientRect(), c = { x: R.left + R.width / 2, y: R.top + R.height / 2 };
+      const pods = [...document.querySelectorAll('.pod')].map(p => Object.assign({ name: p.getAttribute('aria-label'), pad: p.classList.contains('games') && /^M15\.5 15h17/.test(p.querySelector('.icon path').getAttribute('d')) }, at(p)));
+      const key = k => at(document.querySelector(`.kp[data-k="${k}"]`));
+      return { c, R: R.width / 2, pods, lock: key('lock'), on: key('wake'), off: key('sleep'), label: document.getElementById('label3').textContent };
+    });
+    const byX = gp.pods.slice().sort((a, b) => a.x - b.x).map(p => p.name), top = gp.pods.slice().sort((a, b) => a.y - b.y)[0];
+    ok(byX.join() === 'The Pit,Games,Home Assistant' && top.name === 'Games' && Math.abs(top.x - gp.c.x) < 2, `Games on top, the Pit to its left, Home Assistant to its right (${byX.join(', ')})`);
+    ok(gp.pods.find(p => p.name === 'Games').pad && /GAMES/.test(gp.label) && /RETROARCH/.test(gp.label), 'its icon the gamepad, its label GAMES · RETROARCH');
+    ok(gp.lock.x < gp.c.x - gp.R && gp.lock.y > gp.on.y && gp.lock.y < gp.off.y, 'LOCK moved in, between ON and OFF');
+    await sleep(300);
+    await shot(page, 'ctl-games-' + view);
+    await ctlGeometry(page, (land ? 'sideways' : 'upright') + ' with Games');
+    const from = mock.calls.length;
+    await page.locator('.pod.games').tap();
+    ok(await mock.waitFor(() => mock.calls.slice(from).some(c => c.path === '/api/launch' && c.delivered && c.body.pkg === 'com.retroarch.ra32'), 1500), 'the Games pod opens RetroArch on the TV (/api/launch)');
+    ok(await page.evaluate(() => !window.__open.length && !document.getElementById('iris').getAnimations().length), 'and nothing opens on the tablet, no iris');
+    await page.locator('.kp[data-k="lock"]').tap();
+    ok(await until(page, () => window.hub.ctl().locked, 1000), 'LOCK in its new place still locks');
+    ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  } finally { mock.apps.pop(); await ctx.close(); }
+}
 
 const engines = [['webkit', webkit, {}]];
 if (!process.argv.includes('--webkit')) {
@@ -816,7 +852,7 @@ try {
       await tabletFull();
       await otherSize('tablet-land');
       await otherSize('iphone');
-      if (n === 'chromium') { await controller('tablet-land'); await controller('tablet'); }   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
+      if (n === 'chromium') { await controller('tablet-land'); await controller('tablet'); await controllerGames('tablet-land'); await controllerGames('tablet'); }   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
     } finally { await browser.close(); browser = null; }
   }
 } finally {

@@ -86,10 +86,17 @@ every composited layer costs CPU every frame (measured 10-29, `projects/desk-tab
 
 ### Games and DirecTV (11-03, his "set the gaming ring on the big ones, between the pit and home assistant" and "set directv to play on the TV section")
 
-Only on the stick's own HUB (`S.tv`, not the controller): when the app's list holds RetroArch (`GAMES`: `com.retroarch.ra32` and its
+On a TV (`S.tv`): when the app's list holds RetroArch (`GAMES`: `com.retroarch.ra32` and its
 64-bit names), it leaves the apps ring and becomes a fourth pod, **Games**, drawn between the Pit and Home Assistant (`pos: 1.5`;
 slot `i: 3`, so the app's slots 0-2 keep their numbers). Its label says RETROARCH; Select launches it through `HubsApp.launch`
-(which only opens what its list holds). RetroArch uninstalled = the pod goes. The controller keeps RetroArch in its crown.
+(which only opens what its list holds). RetroArch uninstalled = the pod goes.
+**The controller too since 11-04** (his "in the HUB controller just change the icon and move the games ring"): RetroArch leaves
+the crown and is the Games pod (the gamepad icon) on top of the outer ring, the Pit at 230 degrees and Home Assistant at 310
+(three pods: `[230, 270, 310]`; two stay at 245 and 295). The top was LOCK's place, so with Games **LOCK goes in, small, at 180
+on the inner ring, between ON and OFF** (`CT.place`); without RetroArch it is back on top. A tap on Games opens RetroArch on the
+TV (`/api/launch`), no iris, the tablet stays (as the crown's apps). Sideways a right-hand label stops before the panel; upright
+HOME ASSISTANT wraps to two lines. The controller reads the stick's apps when it loads, so a new install shows after a reload.
+`test/remote-check.mjs` → `controllerGames` checks it sideways and upright (shots `ctl-games-tablet*.png`).
 **DirecTV** (`com.att.tv`) is one of the streaming apps on the ring, nothing more. The DIRECTV button under the tile (11-03) was
 **removed 11-04, his word: "get rid of that directv button you put on the tv, i'll use directv as streaming platform."** Don't
 bring it back. Its picture cannot play in the tile anyway: it is DRM-locked to its own player, unlike YouTube's embeds.

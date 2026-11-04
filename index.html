@@ -618,7 +618,7 @@ const ICON = {
   home: '<svg viewBox="0 0 48 48"><path d="M8 23 24 10l16 13M13 19.5V38h22V19.5M21 38v-9h6v9"/></svg>',
   pad: '<svg viewBox="0 0 48 48"><path d="M15.5 15h17c5.4 0 8.6 4.4 9.6 10.6l.9 5.8c.6 3.6-3.6 5.6-6 3.2L32 29.5H16l-5 5.1c-2.4 2.4-6.6.4-6-3.2l.9-5.8C6.9 19.4 10.1 15 15.5 15z"/><path d="M14.5 19.5v6.5M11.25 22.75h6.5"/><circle cx="31" cy="21" r="1.3"/><circle cx="35.5" cy="25" r="1.3"/></svg>',
 };
-// a TV's games: RetroArch leaves the apps ring and is a pod of its own, between the Pit and Home Assistant (his 11-03)
+// a TV's games: RetroArch leaves the apps ring and is a pod of its own, between the Pit and Home Assistant (his 11-03; the controller 11-04)
 const GAMES = ['com.retroarch.ra32', 'com.retroarch', 'com.retroarch.aarch64'];
 const WXI = {
   sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3M5.4 5.4 7 7M17 17l1.6 1.6M5.4 18.6 7 17M17 7l1.6-1.6"/>',
@@ -692,7 +692,7 @@ function layout(force) {
   const g = $('og'); if (land) { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 1); g.setAttribute('y2', 0); } else { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 0); g.setAttribute('y2', 1); }
   const rn = $('runners'); Object.assign(rn.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
   const vis = S.svc.filter(s => !s.gone).sort((a, b) => (a.pos ?? a.i) - (b.pos ?? b.i)).map(s => s.i);   // the pods drawn, spread evenly on the same arc
-  const at = vis.length === 3 ? ang : vis.length === 2 ? [(ang[0] + ang[1]) / 2, (ang[1] + ang[2]) / 2] : [ang[1]];
+  const at = vis.length === 3 ? (CTL ? [230, 270, 310] : ang) : vis.length === 2 ? [(ang[0] + ang[1]) / 2, (ang[1] + ang[2]) / 2] : [ang[1]];   // the controller's three: Games on top, clear of ON and VOL +
   S.geo.pods = [];
   vis.forEach((i, k) => { S.geo.pods[i] = { x: cx + Ro * Math.cos(at[k] * Math.PI / 180), y: cy + Ro * Math.sin(at[k] * Math.PI / 180) }; });
   doc.querySelectorAll('.pod').forEach(p => {
@@ -713,7 +713,8 @@ function fitLabels() {
   if (CTL) {   // the controller: a pod's label outside it, the left one to its left
     doc.querySelectorAll('.label').forEach(l => {
       const c = S.geo.pods[+l.id.slice(5)]; if (!c) return;
-      const left = c.x < S.geo.cx, w = Math.min(210, left ? c.x - S.geo.rp - 22 : S.geo.W - c.x - S.geo.rp - 22);
+      const edge = S.geo.land ? S.geo.cx + S.geo.Ro + S.geo.rp + 36 : S.geo.W;   // sideways the panel starts at --tvL (cx + Ro + rp + 44)
+      const left = c.x < S.geo.cx - 1, w = Math.min(210, left ? c.x - S.geo.rp - 22 : edge - c.x - S.geo.rp - 22);   // the top pod (Games) reads to its right
       l.classList.add('side'); l.classList.toggle('rt', left);
       Object.assign(l.style, { left: (left ? c.x - S.geo.rp - 14 - w : c.x + S.geo.rp + 14) + 'px', top: c.y - 26 + 'px', width: w + 'px', transformOrigin: left ? '100% 50%' : '0 50%' });
     });
@@ -830,6 +831,7 @@ function irisAt(c) { const e = $('iris'); e.style.left = c.x + 'px'; e.style.top
 function launch(i) {
   const s = S.svc[i];
   if (!s || !s.url && !s.app) { toast((s ? s.name.toUpperCase() : 'THAT') + ' IS NOT SET UP YET'); return; }
+  if (CTL && s.app) { launchApp(s.app); return; }   // the controller stays here: Games opens on the TV, no iris (as the crown's apps)
   if (S.launching) return;
   S.launching = true; wake();
   const c = S.geo.pods[i], { s0, s1 } = irisScale(c), e = irisAt(c);
@@ -1555,7 +1557,7 @@ const APPS = {
     let l = given;
     if (!l) { if (!APP || !APP.apps) return; try { l = JSON.parse(APP.apps()); } catch (e) { l = []; } }
     l = Array.isArray(l) ? l.filter(a => a && typeof a.pkg === 'string' && typeof a.name === 'string') : [];
-    const games = CTL ? null : (l.find(a => GAMES.includes(a.pkg)) || {}).pkg || null;   // the stick's own HUB only: the controller keeps it in its crown
+    const games = (l.find(a => GAMES.includes(a.pkg)) || {}).pkg || null;   // the controller too since his 11-04 ("change the icon and move the games ring")
     APPS.list = l.filter(a => a.pkg !== games).slice(0, 16);
     if (games !== (S.games || null)) { S.games = games; loadServices(); buildPods(); layout(true); }
     const box = $('apps'); box.innerHTML = '';
@@ -2115,7 +2117,8 @@ const CT = {
   place() {   // the keys on their rings (layout() calls this with the geometry)
     const g = S.geo; if (!g || !g.ctl) return;
     doc.querySelectorAll('#keys .kp').forEach(el => {
-      const d = CT.KEYS.find(x => x.k === el.dataset.k); if (!d) return;
+      let d = CT.KEYS.find(x => x.k === el.dataset.k); if (!d) return;
+      if (d.k === 'lock' && S.games) d = { a: 180, m: 1 };   // the Games pod takes the top: LOCK goes in, between ON and OFF
       const r = d.m ? g.rm : g.rp, rad = d.m ? g.Ra : g.Ro, t = d.a * Math.PI / 180, x = g.cx + rad * Math.cos(t), y = g.cy + rad * Math.sin(t);
       Object.assign(el.style, { left: x - r + 'px', top: y - r + 'px', width: 2 * r + 'px', height: 2 * r + 'px' });
     });
