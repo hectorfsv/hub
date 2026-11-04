@@ -181,7 +181,6 @@ body.tv #tvcol{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 #yt-idle b{font-family:var(--word);font-weight:400;font-size:28px;letter-spacing:.14em;color:var(--gold-hot)}
 #yt-idle span{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim)}
 #yt-ch{display:flex;gap:8px;margin-top:10px}
-#yt-dtv[hidden]{display:none}
 body.tv #yt-scr.cur{outline:2px solid var(--gold-hot);outline-offset:3px}
 /* the stick: Amazon's WebView puts the video in its own layer under the page and cuts a hole for it, and it cannot cut a
    rounded one: a rounded clip turned every channel black in the tile, full screen (square) played (measured 10-29) */
@@ -621,7 +620,6 @@ const ICON = {
 };
 // a TV's games: RetroArch leaves the apps ring and is a pod of its own, between the Pit and Home Assistant (his 11-03)
 const GAMES = ['com.retroarch.ra32', 'com.retroarch', 'com.retroarch.aarch64'];
-const DTV = 'com.att.tv';   // DirecTV: a button in the TV section too (his 11-03)
 const WXI = {
   sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3M5.4 5.4 7 7M17 17l1.6 1.6M5.4 18.6 7 17M17 7l1.6-1.6"/>',
   moon: '<path d="M19.6 14.8A8.2 8.2 0 0 1 9.2 4.4a8.2 8.2 0 1 0 10.4 10.4z"/>',
@@ -1560,7 +1558,6 @@ const APPS = {
     const games = CTL ? null : (l.find(a => GAMES.includes(a.pkg)) || {}).pkg || null;   // the stick's own HUB only: the controller keeps it in its crown
     APPS.list = l.filter(a => a.pkg !== games).slice(0, 16);
     if (games !== (S.games || null)) { S.games = games; loadServices(); buildPods(); layout(true); }
-    const dtv = $('yt-dtv'); if (dtv) dtv.hidden = !APPS.list.some(a => a.pkg === DTV);
     const box = $('apps'); box.innerHTML = '';
     APPS.list.forEach(a => {
       const d = doc.createElement('div'); d.className = 'tapp'; d.setAttribute('role', 'button'); d.setAttribute('aria-label', a.name);
@@ -1602,11 +1599,9 @@ const YT = {
     body.appendChild(menu);
     menu.querySelectorAll('.cc').forEach(b => b.addEventListener('click', () => { YT.pick(b.dataset.k); if (YT.open) YT.menu(false); if (!CTL && YT.playing()) TV.ring($('yt-scr')); }));
     $('c-chs-x').addEventListener('click', () => YT.menu(false));
-    $('yt-ch').innerHTML = '<button type="button" class="cb wide" id="yt-go">CHANNELS <i>▾</i></button><button type="button" class="cb" id="yt-app">YOUTUBE APP ▸</button>'
-      + `<button type="button" class="cb" id="yt-dtv"${APPS.list.some(a => a.pkg === DTV) ? '' : ' hidden'}>DIRECTV ▸</button>`;
+    $('yt-ch').innerHTML = '<button type="button" class="cb wide" id="yt-go">CHANNELS <i>▾</i></button><button type="button" class="cb" id="yt-app">YOUTUBE APP ▸</button>';
     $('yt-go').addEventListener('click', () => YT.menu(true));
     $('yt-app').addEventListener('click', () => { YT.stop(); launchApp('com.amazon.firetv.youtube'); });
-    $('yt-dtv').addEventListener('click', () => { YT.stop(); launchApp(DTV); });   // its picture is locked to its own app (DRM): it opens full screen
     YT.paint();
   },
   menu(on) {
@@ -1806,7 +1801,7 @@ const TV = {
     const nl = $('news-l').getBoundingClientRect();
     const rows = [...doc.querySelectorAll('.nw')].filter(e => !e.hidden && e.getBoundingClientRect().bottom <= nl.bottom + 1);   // only rows that fit
     return [...doc.querySelectorAll('.tapp'), ...doc.querySelectorAll('.pod:not(.off)'), ...doc.querySelectorAll('.chip'), $('clock'),
-      YT.playing() ? $('yt-scr') : null, $('yt-go'), $('yt-app'), $('yt-dtv'), $('yts-q'), $('yts-go'),
+      YT.playing() ? $('yt-scr') : null, $('yt-go'), $('yt-app'), $('yts-q'), $('yts-go'),
       ...(YTS.open ? [...doc.querySelectorAll('#yts-rows .ysr'), $('yts-x')] : [...rows, $('news-r')]), $('gear')].filter(shown);
   },
   ring(el) {

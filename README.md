@@ -90,8 +90,9 @@ Only on the stick's own HUB (`S.tv`, not the controller): when the app's list ho
 64-bit names), it leaves the apps ring and becomes a fourth pod, **Games**, drawn between the Pit and Home Assistant (`pos: 1.5`;
 slot `i: 3`, so the app's slots 0-2 keep their numbers). Its label says RETROARCH; Select launches it through `HubsApp.launch`
 (which only opens what its list holds). RetroArch uninstalled = the pod goes. The controller keeps RetroArch in its crown.
-**DIRECTV** (`com.att.tv`) is a third button under the tile, shown only when it is installed; it opens the DirecTV app full screen.
-Its picture cannot play in the tile: it is DRM-locked to its own player, unlike YouTube's embeds. It stays on the ring too.
+**DirecTV** (`com.att.tv`) is one of the streaming apps on the ring, nothing more. The DIRECTV button under the tile (11-03) was
+**removed 11-04, his word: "get rid of that directv button you put on the tv, i'll use directv as streaming platform."** Don't
+bring it back. Its picture cannot play in the tile anyway: it is DRM-locked to its own player, unlike YouTube's embeds.
 
 ### The TV layout (10-29 night, his "Go and build the tv layout!")
 

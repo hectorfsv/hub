@@ -678,13 +678,13 @@ try {
       if (ix > 1 && iy > 1) hits2.push(`${na}×${nb}`);
     }
     ok(!hits2.length, `tv with Games: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
-    ok(await page.evaluate(() => { const b = [...document.getElementById('yt-ch').children].filter(e => e.getClientRects().length); return b.map(e => e.id).join() === 'yt-go,yt-app,yt-dtv' && b.every(e => e.scrollWidth <= e.clientWidth + 1); }), 'under the tile: CHANNELS, the YouTube app and DIRECTV, no label cut');
+    ok(await page.evaluate(() => { const b = [...document.getElementById('yt-ch').children].filter(e => e.getClientRects().length); return b.map(e => e.id).join() === 'yt-go,yt-app' && b.every(e => e.scrollWidth <= e.clientWidth + 1); }), 'under the tile: CHANNELS and the YouTube app only, DirecTV installed (his 11-04: DirecTV is a streaming app, its button gone), no label cut');
     await page.waitForTimeout(1600);   // the pods land one after another
     await shot(page, 'tv-games');
     await page.evaluate(() => document.querySelector('.pod.games').click()); await page.waitForTimeout(400);
     ok((await page.evaluate(() => window.__calls)).includes('launch:com.retroarch.ra32'), 'the Games pod asks the app to open RetroArch');
-    await page.evaluate(() => { window.__calls.length = 0; document.getElementById('yt-dtv').click(); });
-    ok((await page.evaluate(() => window.__calls)).includes('launch:com.att.tv'), 'DIRECTV under the tile asks the app to open DirecTV');
+    await page.evaluate(() => { window.__calls.length = 0; document.querySelector('.tapp[data-pkg="com.att.tv"]').click(); });
+    ok((await page.evaluate(() => window.__calls)).includes('launch:com.att.tv'), 'DirecTV on the ring asks the app to open it');
     await page.evaluate(() => hub.tv().TV.ring(document.querySelector('.pod.pit')));
     const walk = [];   // unlinked here, so the Pit's LINK LIVE COOKS chip sits under it first
     for (let k = 0; k < 3; k++) { await page.keyboard.press('ArrowDown'); walk.push(await page.evaluate(() => { const c = document.querySelector('.cur'); return c && (c.getAttribute('aria-label') || c.textContent.trim()); })); }
