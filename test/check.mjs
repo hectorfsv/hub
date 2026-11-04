@@ -484,7 +484,7 @@ try {
     ok((await page.$$eval('.tapp', a => a.length)) === 13, 'thirteen apps around the clock');
     ok(/AIR\s*70\s*AQI/.test(await page.textContent('#tvline')) && !(await page.isVisible('#pw-lab')) && !(await page.isVisible('#aq-lab')), 'the air is a text line under the date; the drawn labels step aside');
     ok((await page.$$eval('#c-chs .cc', c => c.length)) === 12, 'twelve channels in the sheet (10-30: CBS and Canal 5 out, ABC7 LA and Noticias Telemundo in)');
-    ok(await page.evaluate(() => [...document.getElementById('yt-ch').children].map(b => b.id).join() === 'yt-go,yt-app' && document.getElementById('c-chs').hidden), 'under the tile only CHANNELS and the YouTube app; no channel names (his 10-30), the sheet closed');
+    ok(await page.evaluate(() => [...document.getElementById('yt-ch').children].filter(b => b.getClientRects().length).map(b => b.id).join() === 'yt-go,yt-app' && document.getElementById('c-chs').hidden), 'under the tile only CHANNELS and the YouTube app (no DirecTV installed); no channel names (his 10-30), the sheet closed');
     const touched = await page.evaluate(async () => {   // the Pit's poll every minute: with nothing new it must touch nothing
       hub.renderPods(); let n = 0; const mo = new MutationObserver(l => { n += l.length; });
       document.querySelectorAll('.pod, .label').forEach(e => mo.observe(e, { subtree: true, childList: true, attributes: true, characterData: true }));
@@ -638,6 +638,61 @@ try {
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     ok(await page.evaluate(() => !document.querySelector('#yt-scr iframe')), 'Back again stops the video, as for a channel');
     await shot(page, 'tv-layout');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntv: the Games pod and DirecTV (his 11-03)');
+    const ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+    const APPS = [['Netflix', 'com.netflix.ninja'], ['Prime Video', 'com.amazon.firebat'], ['YouTube', 'com.amazon.firetv.youtube'], ['Spotify', 'com.spotify.tv.android'],
+      ['DIRECTV', 'com.att.tv'], ['RetroArch', 'com.retroarch.ra32']].map(([name, pkg]) => ({ name, pkg, icon: ICON }));
+    const { ctx, page, errors } = await open('tv', { app: true, tv: true, apps: APPS, query: 'boot=0' });
+    await page.waitForFunction(() => document.querySelectorAll('.nw').length > 0, null, { timeout: 8000 });
+    await page.waitForTimeout(600);
+    const ring = await page.$$eval('.tapp', a => a.map(e => e.dataset.pkg));
+    ok(ring.length === 5 && !ring.includes('com.retroarch.ra32') && ring.includes('com.att.tv'), `RetroArch leaves the ring, DirecTV stays on it (${ring.join(' ')})`);
+    const pods = await page.$$eval('.pod', p => p.map(e => { const r = e.getBoundingClientRect(); return { name: e.getAttribute('aria-label'), y: r.top, x: r.left, off: e.classList.contains('off') }; }));
+    const byY = pods.slice().sort((a, b) => a.y - b.y).map(p => p.name);
+    ok(pods.length === 3 && byY.join() === 'The Pit,Games,Home Assistant', `three pods, Games between the Pit and Home Assistant (${byY.join(', ')})`);
+    ok(pods.find(p => p.name === 'Games').x > pods.find(p => p.name === 'The Pit').x && !pods.find(p => p.name === 'Games').off, 'Games sits on the orbit (the middle of the arc), lit, not off');
+    ok(/GAMES/.test(await page.textContent('#label3')) && /RETROARCH/.test(await page.textContent('#st3')), 'its label: GAMES · RETROARCH');
+    const g = await page.evaluate(() => {
+      const box = e => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom }; };
+      const txt = l => { const rs = [...l.children].filter(c => c.getClientRects().length).map(box); return { x: Math.min(...rs.map(r => r.x)), y: Math.min(...rs.map(r => r.y)), r: Math.max(...rs.map(r => r.r)), b: Math.max(...rs.map(r => r.b)) }; };
+      const items = [['core', box(document.querySelector('.core'))]];
+      document.querySelectorAll('.tapp').forEach((a, i) => items.push(['app' + i, box(a)]));
+      document.querySelectorAll('.pod').forEach(p => items.push(['pod' + p.dataset.i, box(p)]));
+      document.querySelectorAll('.label').forEach(l => items.push(['label' + l.id.slice(5), txt(l)]));
+      for (const id of ['wx', 'hours', 'yt', 'news', 'foot']) items.push([id, box(document.getElementById(id))]);
+      document.querySelectorAll('#yt-ch .cb').forEach(b => { if (b.getClientRects().length) items.push([b.id, box(b)]); });
+      return { W: innerWidth, H: innerHeight, items };
+    });
+    const off = g.items.filter(([, r]) => r.x < 0 || r.y < 0 || r.r > g.W + .5 || r.b > g.H + .5).map(([n]) => n);
+    ok(!off.length, `tv with Games: everything on screen${off.length ? ' (off: ' + off.join(', ') + ')' : ''}`);
+    const hits2 = [];
+    for (let i = 0; i < g.items.length; i++) for (let j = i + 1; j < g.items.length; j++) {
+      const [na, ra] = g.items[i], [nb, rb] = g.items[j];
+      if (/^pod(\d)$/.test(na) && nb === 'label' + na.slice(3)) continue;
+      if (/^yt-/.test(na) && nb === 'yt' || /^yt-/.test(nb) && na === 'yt') continue;   // the buttons live inside the tile's box
+      const ix = Math.min(ra.r, rb.r) - Math.max(ra.x, rb.x), iy = Math.min(ra.b, rb.b) - Math.max(ra.y, rb.y);
+      if (ix > 1 && iy > 1) hits2.push(`${na}×${nb}`);
+    }
+    ok(!hits2.length, `tv with Games: nothing overlaps${hits2.length ? ' (' + hits2.join(', ') + ')' : ''}`);
+    ok(await page.evaluate(() => { const b = [...document.getElementById('yt-ch').children].filter(e => e.getClientRects().length); return b.map(e => e.id).join() === 'yt-go,yt-app,yt-dtv' && b.every(e => e.scrollWidth <= e.clientWidth + 1); }), 'under the tile: CHANNELS, the YouTube app and DIRECTV, no label cut');
+    await page.waitForTimeout(1600);   // the pods land one after another
+    await shot(page, 'tv-games');
+    await page.evaluate(() => document.querySelector('.pod.games').click()); await page.waitForTimeout(400);
+    ok((await page.evaluate(() => window.__calls)).includes('launch:com.retroarch.ra32'), 'the Games pod asks the app to open RetroArch');
+    await page.evaluate(() => { window.__calls.length = 0; document.getElementById('yt-dtv').click(); });
+    ok((await page.evaluate(() => window.__calls)).includes('launch:com.att.tv'), 'DIRECTV under the tile asks the app to open DirecTV');
+    await page.evaluate(() => hub.tv().TV.ring(document.querySelector('.pod.pit')));
+    const walk = [];   // unlinked here, so the Pit's LINK LIVE COOKS chip sits under it first
+    for (let k = 0; k < 3; k++) { await page.keyboard.press('ArrowDown'); walk.push(await page.evaluate(() => { const c = document.querySelector('.cur'); return c && (c.getAttribute('aria-label') || c.textContent.trim()); })); }
+    ok(walk[0] === 'LINK LIVE COOKS' && walk[1] === 'Games' && walk[2] !== 'Home Assistant', `the remote: Down from the Pit walks its chip, then Games; Home Assistant, not set up, is no stop (${walk.join(', ')})`);
+    await page.evaluate(() => { const l = JSON.parse(window.HubsApp.apps()).filter(a => a.pkg !== 'com.retroarch.ra32'); window.HubsApp.apps = () => JSON.stringify(l); hub.appsReady(); });
+    ok((await page.$$eval('.pod', p => p.length)) === 2 && !(await page.$('.pod.games')), 'RetroArch removed: the Games pod goes, two pods again');
+    await page.evaluate(() => { const l = JSON.parse(window.HubsApp.apps()).concat([{ name: 'RetroArch', pkg: 'com.retroarch.ra32', icon: '' }]); window.HubsApp.apps = () => JSON.stringify(l); hub.appsReady(); });
+    ok((await page.$$eval('.pod', p => p.length)) === 3, 'installed again: the pod comes back');
     ok(!errors.length, errs(errors));
     await ctx.close();
   }
