@@ -97,6 +97,9 @@ on the inner ring, between ON and OFF** (`CT.place`); without RetroArch it is ba
 TV (`/api/launch`), no iris, the tablet stays (as the crown's apps). Sideways a right-hand label stops before the panel; upright
 HOME ASSISTANT wraps to two lines. The controller reads the stick's apps when it loads, so a new install shows after a reload.
 `test/remote-check.mjs` → `controllerGames` checks it sideways and upright (shots `ctl-games-tablet*.png`).
+**During a cook the controller keeps the forecast (11-05, his "the bottom has a gap ... only when the ambers come on"):** the TV swaps
+the hourly forecast for the cook card, but the controller never shows the cook card (the Pit pod carries it), so the row vanished and
+the panel slid up 61 px, leaving the gap. `body.ctl.forge #hours` keeps it: a cook and no cook lay out the same, both ways (measured).
 **DirecTV** (`com.att.tv`) is one of the streaming apps on the ring, nothing more. The DIRECTV button under the tile (11-03) was
 **removed 11-04, his word: "get rid of that directv button you put on the tv, i'll use directv as streaming platform."** Don't
 bring it back. Its picture cannot play in the tile anyway: it is DRM-locked to its own player, unlike YouTube's embeds.
