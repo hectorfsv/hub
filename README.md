@@ -39,14 +39,47 @@ one to every path drawn after it (no transition on `.m-w`); the pulses under the
 channel (they live inside `#reactor`, after `#ring-static`). **Before "put it on": the 10-29 test on the glass
 (61.9 fps, 0 late of ~500), calm and with the forge lit.**
 
-**Tests:** `node test/check.mjs` is 371 checks now (95 for Mark II: four sizes in a browser, the app's taps with the list
-Mark II needs, a cook upright and sideways, the layers, night, a TV untouched); `node test/remote-check.mjs` 473, unchanged.
+**Tests:** `node test/check.mjs` is 384 checks now (108 for Mark II: four sizes in a browser, the app's taps with the list
+Mark II needs and the way back as the app really does it (its slot, a hidden page, no word after an Android app), Drone
+Link not opening, a cook upright and sideways, the layers, night, a TV untouched); `node test/remote-check.mjs` 487 (14 new:
+the controller as a service of the main HUB). Both all passed 11-19 19:35.
 
 **His verdict, 11-19 ~17:05, after opening it on his phone: "I opened it on my phone, i liked it!"**
 
-**Still to do, in order:** (1) the tablet's Hubs app (below); (2) the test on the glass; (3) his
-"put it on" (the tablet's Setup gets this page with `?mk2`, or the flag becomes the default off a TV). Offered, his call:
-one still from Dionysus, a forged-metal plate behind everything (the drawn `#bg` is its stand-in).
+**The tablet's app, 11-19 evening: Hubs 2.24 is BUILT on the Mac, NOT installed** (the tablet is still on 2.21 and still
+the remote). What it does and why: `projects/desk-tablet/README.md`, "Hubs 2.24" (a fourth slot for the Remote, the key
+bridge on that slot's page, Drone Link's cockpit on the tablet's own launch list, a no said to the page).
+
+**The page's side of it (same evening, in the working copy, NOT pushed):**
+- **Coming back lands on the right pod.** The app says which of ITS slots closed (`hub.returned(slot)`: 0 Lounge, 1 the
+  Pit, 3 Remote) and Mark II's five have their own order, so the slot now finds its pod. Before, back from the Pit closed
+  the iris on the Remote (the suite had been calling `returned` with the pod's number, so it never saw it).
+- **Two ways back the app never announces** are tracked by the page itself (`S.away`, set in `launch`; `S.left` once the
+  page was hidden): Drone Link (an Android app), and the controller shown again as a service after one of its pods
+  opened on the tablet. When the page shows again it closes its own iris onto that pod, 60 ms later so the app's own
+  "returned" wins when there is one. Without this the iris stayed open over the whole page (its centre is near black).
+- **A pod that does not open says so:** the app's no (`hub.launchFailed(pkg)`, Hubs 2.24) or, with an app that says
+  nothing, still being on the HUB 2.2 s after the tap: the room opens again and the toast reads `DRONE LINK DID NOT OPEN`.
+- **The controller never draws the tablet's Lounge slot,** with or without an address (Mark II gives the tablet its Lounge
+  back; the controller keeps the TV's pods). The Remote's own slot (the fourth) is never read by it either.
+- Only a tracked pod uses any of this (`S.mk2` with an app, or `?ctl`): the old HUB and the TV's HUB run the lines they ran.
+- **Found, NOT fixed, his call: the TV's Games pod has the same stuck iris today** (back from RetroArch the HUB is all
+  near-black until the page reloads; probed 11-19 in headless Chromium, the story in `research/history/hub.md`). The fix
+  is one condition in `launch` (`track` also when `S.tv` and the pod is an app) plus a check.
+
+**Still to do, in order:** (1) his go for the tablet: push these page changes, install 2.24, copy the tablet's prefs, give
+Setup the five (the HUB page with `?mk2`, the Lounge's address back, the Remote = today's front door, moved on the tablet
+itself); (2) the on-tablet checks `five remote drone` and the test on the glass (`smooth`); (3) his "put it on" (it stays),
+or the prefs go back and it waits.
+
+**On his go (moved word for word from NOW.md, 11-19; he liked the look, 17:05; asked 11-19 19:36):** Hubs 2.24 is BUILT on
+the Mac (Drone and Remote as real pods) and the page's fixes are in the working copy, NOT pushed; both suites pass (384 and
+487). The tablet is NOT touched: asleep by his power button, still on 2.21, still the remote. On it, in order: commit and
+push `projects/hub`; wake the tablet; `ANDROID_SERIAL=<its USB serial> ./build.sh --install`; `./mk2-setup.sh --on`;
+`ANDROID_SERIAL=<its USB serial> node test/device-check.mjs five remote drone smooth memory`; then his "put it on", or
+`./mk2-setup.sh --undo`. (The build, the Setup script and the device checks are in `projects/desk-tablet/app/`; its
+manual, "Hubs 2.24", has the serial: this repo is public.) Offered, his call: one still from Dionysus, a forged-metal plate behind everything (the
+drawn `#bg` is its stand-in).
 
 **Before touching the tablet (moved word for word from NOW.md, 11-19):** The tablet is shared with the drone and is still
 on the remote: leave Drone Link installed and its locks as they are (voice take off LOCKED, the bench test OFF); ask him

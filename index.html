@@ -668,7 +668,9 @@ function loadServices() {
   }
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
-    const gone = !s.url && (!s.name || CTL && i === 0);   // a slot with no name and no address is not drawn at all; the tablet's Lounge slot stays off the controller
+    // a slot with no name and no address is not drawn at all; the tablet's Lounge slot stays off the controller, with or
+    // without an address (Mark II gives the tablet its Lounge back, 11-19; the controller keeps the TV's pods)
+    const gone = CTL && i === 0 || !s.url && !s.name;
     return { i, gone, name: String(s.name || DEFAULTS[i].name), url: String(s.url || ''), mic: !!s.mic };
   });
   if (S.games) S.svc.push({ i: 3, gone: false, name: 'Games', url: '', mic: false, app: S.games, pos: 1.5 });   // an app, not a page: drawn after the Pit
@@ -1037,6 +1039,11 @@ function launch(i) {
   if (CTL && s.app) { launchApp(s.app); return; }   // the controller stays here: Games opens on the TV, no iris (as the crown's apps)
   if (S.launching) return;
   S.launching = true; wake();
+  // the app says "returned" only when a service of the HUB's own view closes. Two ways back it never announces: an
+  // Android app a Mark II pod opened (Drone Link), and the controller shown again as a service after one of its pods
+  // opened on the tablet. Those the page tracks itself: gone once this page was hidden, back when it shows again.
+  const trip = S.trip = (S.trip || 0) + 1, track = S.mk2 && !!s.app || CTL;
+  S.away = track ? i : null; S.left = false;
   const lead = S.mk2 ? 130 : 0;   // Mark II: the wire fires and the rings kick first, then the pod opens
   if (S.mk2) mk2Lock(i);
   const c = S.geo.pods[i], { s0, s1 } = irisScale(c), e = irisAt(c);
@@ -1049,12 +1056,28 @@ function launch(i) {
     else if (CTL) CT.hub({ do: 'open', i }); else location.assign(s.url);
   }, 230 + lead);
   setTimeout(() => {   // still here (the app said no, or a browser stayed): open the room again
+    if (track) {
+      if (S.trip !== trip || S.away !== i) return;   // back already, or the app said no and the page said so
+      S.launching = false;
+      if (doc.hidden || S.left) return;   // gone into it: the iris closes when this page shows again
+      S.away = null; irisOff();
+      if (s.app) toast(appName(s) + ' DID NOT OPEN');
+      return;
+    }
     S.launching = false;
-    if (!doc.hidden) e.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    if (!doc.hidden) irisOff();
   }, 2200);
 }
+function irisOff() { $('iris').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' }); }
+const appName = s => s && s.key === 'drone' ? 'DRONE LINK' : s ? s.name.toUpperCase() : 'THAT APP';
+function launchFailed(pkg) {   // the app's own no (Hubs 2.24): not on this tablet, not one of its apps, or Android refused
+  const i = S.svc.findIndex(s => s.app === pkg);
+  if (i < 0 || S.away !== i) return;   // only a pod this page is tracking (Mark II's Drone); a TV's ring and its Games pod stay as they were
+  S.trip = (S.trip || 0) + 1; S.launching = false; S.away = null; S.left = false;
+  irisOff(); toast(appName(S.svc[i]) + ' DID NOT OPEN');
+}
 function returned(i) {
-  S.launching = false;
+  S.trip = (S.trip || 0) + 1; S.launching = false; S.away = null; S.left = false;
   const c = S.geo && S.geo.pods[i] || { x: innerWidth / 2, y: innerHeight / 2 }, { s0, s1 } = irisScale(c), e = irisAt(c);
   e.getAnimations().forEach(a => a.cancel());
   e.animate([{ transform: `scale(${s1})`, opacity: 1 }, { transform: `scale(${s1 * .85})`, opacity: 1, offset: .15 }, { transform: `scale(${s0})`, opacity: 0 }],
@@ -1379,7 +1402,9 @@ function finishBoot() {
 
 // ---- in and out of view: nothing runs while a service is on screen ----
 doc.addEventListener('visibilitychange', () => {
-  if (doc.hidden) return;
+  if (doc.hidden) { if (S.away != null) S.left = true; return; }
+  // back from what a tracked pod opened (launch): a moment first, so the app's own "returned" wins when it sends one
+  if (S.away != null && S.left) setTimeout(() => { if (S.away != null && S.left && !doc.hidden) returned(S.away); }, 60);
   S.idleAt = Date.now(); tick(); weather(false); pitPoll(); air(false); renderTimer();
   if (Date.now() - (S.checkedAt || 0) > 5 * MIN) { S.checkedAt = Date.now(); checkAll(); }
 });
@@ -1676,7 +1701,10 @@ function holiday(d) {
 
 // ---- for the app and the tests ----
 window.hub = {
-  returned, renderPods,   // renderPods: the tests check that a poll with nothing new touches nothing
+  // the app says which of ITS slots closed; Mark II's five have their own order, so the slot finds its pod
+  returned(slot) { returned(S.mk2 ? S.svc.findIndex(s => s.slot === slot) : slot); },
+  launchFailed,
+  renderPods,   // renderPods: the tests check that a poll with nothing new touches nothing
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
   state() {
     const o = { booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() };

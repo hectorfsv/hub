@@ -34,13 +34,13 @@ const keyCalls = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/a
 const sumKey = (k, from = 0) => keyCalls(from).filter(c => c.body.k === k).reduce((s, c) => s + c.body.n, 0);
 const anyKeyRequest = (from = 0) => mock.calls.slice(from).filter(c => c.path === '/api/key');
 
-async function open(view, { query = '', app = false, lane = false, at = '/' } = {}) {
+async function open(view, { query = '', app = false, lane = false, at = '/', svc = null } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::|ERR_|NetworkError|Load failed|cancelled|aborted/i.test(m.text())) errors.push(m.text()); });
-  await page.addInitScript(([app, lane]) => {
+  await page.addInitScript(([app, lane, svc]) => {
     window.__fetchAt = [];                   // where the page stood when it made each call (the key must already be gone)
     const f = window.fetch.bind(window);
     window.fetch = (input, init) => { window.__fetchAt.push({ url: String((input && input.url) || input), href: location.href }); return f(input, init); };
@@ -49,7 +49,7 @@ async function open(view, { query = '', app = false, lane = false, at = '/' } = 
       window.HubsApp = {
         dim: on => window.__dim.push(on),
         panel: () => { window.__panel = (window.__panel || 0) + 1; },
-        services: () => JSON.stringify({ version: '2.6', services: [{ name: 'Lounge', url: '', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/' }, { name: 'Home Assistant', url: '' }] }),
+        services: () => JSON.stringify({ version: svc ? '2.24' : '2.6', services: svc || [{ name: 'Lounge', url: '', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/' }, { name: 'Home Assistant', url: '' }] }),
         open: i => window.__open.push(i),
         battery: () => JSON.stringify({ level: .47, charging: false }),
       };
@@ -62,7 +62,7 @@ async function open(view, { query = '', app = false, lane = false, at = '/' } = 
         });
       }
     }
-  }, [app, lane]);
+  }, [app, lane, svc]);
   await page.goto(mock.url + at + (query ? '?' + query : ''));
   return { ctx, page, errors };
 }
@@ -804,6 +804,34 @@ async function controller(view) {
 }
 // RetroArch on the stick (his 11-04, "change the icon and move the games ring"): out of the crown, the Games pod on top
 // between the Pit and Home Assistant, as on the TV; LOCK goes in, between ON and OFF
+// Mark II (11-19): the tablet's front door is the main HUB again and the controller is one of the app's services (the
+// Remote pod). The app's list then holds the Lounge's address and a fourth slot, the remote itself; and when one of the
+// controller's pods opens on the tablet, nobody tells the controller "returned": it is simply shown again later.
+async function controllerAsService(view) {
+  console.log(`\n${engineName} controller (${view}) as a service of the tablet's main HUB (Hubs 2.24's list)`);
+  mock.reset();
+  const svc = [{ name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
+    { name: 'Home Assistant', url: '', mic: false }, { name: 'Remote', url: mock.url + '/hub?ctl&k=' + TOKEN, mic: false }];
+  const { ctx, page, errors } = await open(view, { at: '/hub', query: 'ctl&boot=0&dim=600000&k=' + TOKEN, app: true, lane: true, svc });
+  try {
+    ok(await until(page, () => window.hub && JSON.parse(hub.state()).booted, 8000), 'the controller is up');
+    await sleep(600);
+    ok(await page.evaluate(() => document.querySelectorAll('.pod').length === 2 && !!document.querySelector('.pod.pit') && ![...document.querySelectorAll('.label b')].some(b => /LOUNGE|REMOTE/.test(b.textContent))),
+      "still two pods, the Pit and Home Assistant: the tablet's Lounge (now with its address) and the Remote slot stay off the controller");
+    const hide = h => page.evaluate(h => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); }, h);
+    const irisO = () => page.evaluate(() => +getComputedStyle(document.getElementById('iris')).opacity);
+    await page.locator('.pod.pit').tap();
+    ok(await until(page, () => window.__open.length === 1 && window.__open[0] === 1, 1500), "the Pit's pod opens the Pit on the tablet (HubsApp.open 1)");
+    await hide(true); await sleep(2300);   // the Pit has the screen; past launch()'s 2.2 s
+    ok((await irisO()) === 1, 'behind the Pit the controller keeps its iris open');
+    await hide(false); await sleep(1100);   // he taps Remote on the HUB again: the app only shows the view
+    ok((await irisO()) === 0, 'shown again with no word from the app: the iris closes by itself, the controller is clear');
+    await page.locator('.pod.pit').tap();
+    ok(await until(page, () => window.__open.length === 2, 1500), 'and its pods answer again');
+    ok(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  } finally { await ctx.close(); }
+}
+
 async function controllerGames(view) {
   const land = view === 'tablet-land';
   console.log(`\n${engineName} controller (${land ? 'sideways' : 'upright'}) with RetroArch on the stick: the Games pod`);
@@ -852,7 +880,7 @@ try {
       await tabletFull();
       await otherSize('tablet-land');
       await otherSize('iphone');
-      if (n === 'chromium') { await controller('tablet-land'); await controller('tablet'); await controllerGames('tablet-land'); await controllerGames('tablet'); }   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
+      if (n === 'chromium') { await controller('tablet-land'); await controller('tablet'); await controllerGames('tablet-land'); await controllerGames('tablet'); await controllerAsService('tablet-land'); await controllerAsService('tablet'); }   // the tablet's web view is Chromium; WebKit's synthetic taps land ~11% off on a page zoomed to 1443 px (measured 10-30)
     } finally { await browser.close(); browser = null; }
   }
 } finally {

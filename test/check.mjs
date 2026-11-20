@@ -741,20 +741,70 @@ try {
     await page.waitForTimeout(1500);
     const tapAt = async i => { const b = await page.locator(`.pod[data-i="${i}"]`).boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(650); };
     const calls = () => page.evaluate(() => window.__calls);
-    const back = async i => { await page.evaluate(k => window.hub.returned(k), i); await page.waitForTimeout(900); };
+    // as the app does it: its view is hidden while a service is in front; coming back it shows again and the app says which
+    // of ITS slots closed (NEXT's order, not the pods'). An Android app (Drone Link) gets no "returned" at all.
+    const hide = h => page.evaluate(h => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); }, h);
+    const back = async slot => { await hide(true); await page.waitForTimeout(200); await hide(false); await page.evaluate(k => window.hub.returned(k), slot); await page.waitForTimeout(950); };
+    const iris = () => page.evaluate(() => { const e = document.getElementById('iris'); return { x: parseFloat(e.style.left), y: parseFloat(e.style.top), o: +getComputedStyle(e).opacity }; });
+    const onPod = async i => { const ir = await iris(), c = (await state(page)).geo.pods[i]; return ir.o === 0 && Math.abs(ir.x - c.x) < 1 && Math.abs(ir.y - c.y) < 1; };
+    const toastOn = () => page.evaluate(() => document.getElementById('toast').classList.contains('on') ? document.getElementById('toast').textContent : '');
     ok((await state(page)).live === '11011' && (await page.$$eval('#mk2-pz .pz', z => z.length)) === 4, 'the core feeds four: Drone, Remote, the Pit, the Lounge (Home is not set up)');
     await tapAt(0);
     ok((await calls()).includes('launch:com.hectorfsv.dronelink'), 'Drone asks the app to open Drone Link');
-    await back(0); await tapAt(1);
+    await hide(true); await page.waitForTimeout(1900);   // Drone Link has the screen, past the page's 2.2 s "still here?"
+    ok((await iris()).o === 1 && !(await toastOn()), 'while Drone Link is in front the iris stays open and the page says nothing');
+    await hide(false); await page.waitForTimeout(1000);
+    ok(await onPod(0), 'back from Drone Link (no word from the app): the iris closes onto the Drone pod');
+    await tapAt(1);
     ok((await calls()).includes('open:3'), "Remote asks the app for the remote's own slot (3)");
-    await back(1); await tapAt(4);
+    await back(3);
+    ok(await onPod(1), "the app says slot 3 closed: the iris closes onto the Remote pod (pod 1), not onto pod 3");
+    await tapAt(4);
     ok((await calls()).includes('open:0'), 'the Lounge opens slot 0');
-    await back(4); await tapAt(3);
+    await back(0);
+    ok(await onPod(4), 'slot 0 closed: the iris closes onto the Lounge pod (pod 4)');
+    await tapAt(3);
     ok((await calls()).includes('open:1'), 'the Pit opens slot 1');
-    await back(3); const n = (await calls()).length; await tapAt(2);
+    await back(1);
+    ok(await onPod(3), 'slot 1 closed: the iris closes onto the Pit pod (pod 3)');
+    const n = (await calls()).length; await tapAt(2);
     ok((await calls()).length === n && /HOME IS NOT SET UP YET/.test(await page.textContent('#toast')), 'Home (not set up) opens nothing and says so');
     ok((await state(page)).locks === 4, 'each of the four taps fired its wire and kicked the rings');
     ok(await page.isVisible('#gear'), 'the gear shows in the app');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntablet: Mark II, Drone Link does not open, or opens and closes fast');
+    const { ctx, page, errors } = await open('tablet', { app: true, services: NEXT, query: 'mk2&boot=0' });
+    await page.waitForTimeout(1500);
+    const tap0 = async () => { const b = await page.locator('.pod[data-i="0"]').boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); };
+    const hide = h => page.evaluate(h => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); }, h);
+    const irisO = () => page.evaluate(() => +getComputedStyle(document.getElementById('iris')).opacity);
+    const toastOn = () => page.evaluate(() => document.getElementById('toast').classList.contains('on') ? document.getElementById('toast').textContent : '');
+    const quiet = () => page.evaluate(() => { const t = document.getElementById('toast'); t.classList.remove('on'); t.textContent = ''; });
+    // the app says no at once (Hubs 2.24: not on this tablet, not one of its apps)
+    await tap0(); await page.waitForTimeout(450);
+    await page.evaluate(() => window.hub.launchFailed('com.hectorfsv.dronelink')); await page.waitForTimeout(450);
+    ok(/DRONE LINK DID NOT OPEN/.test(await toastOn()) && (await irisO()) === 0, "the app's no: the room opens again and the page says DRONE LINK DID NOT OPEN");
+    await page.waitForTimeout(1700); await quiet();   // past that tap's 2.2 s: it must not speak a second time
+    await page.waitForTimeout(300);
+    ok(!(await toastOn()), 'said once, not again when the 2.2 s check comes');
+    // an app that says nothing (2.21 on the tablet today): still here after 2.2 s
+    const n0 = (await page.evaluate(() => window.__calls)).filter(c => c.startsWith('launch:')).length;
+    await tap0(); await page.waitForTimeout(1500);
+    ok((await page.evaluate(() => window.__calls)).filter(c => c.startsWith('launch:')).length === n0 + 1 && !(await toastOn()) && (await irisO()) === 1, 'a second tap asks again (the first no left no lock); for 2 s the iris waits');
+    await page.waitForTimeout(1200);
+    ok(/DRONE LINK DID NOT OPEN/.test(await toastOn()) && (await irisO()) === 0, 'no answer and still on the HUB after 2.2 s: the room opens again and the page says so');
+    await quiet();
+    // it opens, and he is back within a second (Back in the cockpit)
+    await tap0(); await page.waitForTimeout(500); await hide(true); await page.waitForTimeout(500); await hide(false); await page.waitForTimeout(1000);
+    ok((await irisO()) === 0 && !(await toastOn()), 'back inside 2.2 s: the iris has closed');
+    await page.waitForTimeout(900);
+    ok((await irisO()) === 0 && !(await toastOn()) && (await page.evaluate(() => getComputedStyle(document.getElementById('iris')).opacity)) === '0', 'and the 2.2 s check adds nothing: no flash, no line');
+    // a launchFailed for something this page is not opening changes nothing
+    await page.evaluate(() => window.hub.launchFailed('com.example.other')); await page.waitForTimeout(300);
+    ok(!(await toastOn()), "a no for an app the page did not ask for: nothing");
     ok(!errors.length, errs(errors));
     await ctx.close();
   }
