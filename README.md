@@ -14,7 +14,7 @@ the Pit, embers rise and the bottom of the screen glows like a firebox.
 - **In any browser,** the pods are plain links.
 - **Samples:** `?demo=cook` shows a pretend brisket; `?demo=night` dims after 4 s; `?boot=0` skips the start-up check.
 
-## Mark II: the main HUB, five pods and a new look (his ask 11-19). ON PREVIEW: `?mk2`, waiting for his eye
+## Mark II: the main HUB, five pods and a new look (his ask 11-19). ON PREVIEW: `?mk2`; he liked it (11-19 17:05)
 
 **Look at it:** https://hectorfsv.github.io/hub/?mk2&as=tablet (`as=tablet` draws Drone and Remote as the tablet's app
 will; without it a browser draws them unfed and a tap says "OPENS ON THE TABLET"). Samples work with it: `&demo=cook`,
@@ -42,7 +42,9 @@ channel (they live inside `#reactor`, after `#ring-static`). **Before "put it on
 **Tests:** `node test/check.mjs` is 371 checks now (95 for Mark II: four sizes in a browser, the app's taps with the list
 Mark II needs, a cook upright and sideways, the layers, night, a TV untouched); `node test/remote-check.mjs` 473, unchanged.
 
-**Still to do, in order:** (1) his eye on the preview; (2) the tablet's Hubs app (below); (3) the test on the glass; (4) his
+**His verdict, 11-19 ~17:05, after opening it on his phone: "I opened it on my phone, i liked it!"**
+
+**Still to do, in order:** (1) the tablet's Hubs app (below); (2) the test on the glass; (3) his
 "put it on" (the tablet's Setup gets this page with `?mk2`, or the flag becomes the default off a TV). Offered, his call:
 one still from Dionysus, a forged-metal plate behind everything (the drawn `#bg` is its stand-in).
 
