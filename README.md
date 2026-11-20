@@ -48,6 +48,10 @@ Mark II needs, a cook upright and sideways, the layers, night, a TV untouched); 
 "put it on" (the tablet's Setup gets this page with `?mk2`, or the flag becomes the default off a TV). Offered, his call:
 one still from Dionysus, a forged-metal plate behind everything (the drawn `#bg` is its stand-in).
 
+**Before touching the tablet (moved word for word from NOW.md, 11-19):** The tablet is shared with the drone and is still
+on the remote: leave Drone Link installed and its locks as they are (voice take off LOCKED, the bench test OFF); ask him
+before closing or replacing the drone's screen; copy the tablet's prefs before changing its Setup
+
 ### His ask, word for word
 
 **His words, 11-19 ~16:10, in order.** To my read ("the tablet opens on the HUB again, with two new pods: Drone opens Drone
