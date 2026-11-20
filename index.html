@@ -529,9 +529,11 @@ body.mk2 .pod .orb{inset:-13%;animation:none;will-change:auto}
 body.mk2 .pod .orb::before{border:0;background:repeating-conic-gradient(rgba(255,206,130,.62) 0deg,rgba(255,206,130,.62) 1.4deg,transparent 1.4deg,transparent 10deg);
   -webkit-mask:radial-gradient(circle closest-side,transparent 0,transparent 88.5%,#000 89.5%,#000 97%,transparent 98%);mask:radial-gradient(circle closest-side,transparent 0,transparent 88.5%,#000 89.5%,#000 97%,transparent 98%)}
 body.mk2 .pod .orb::after{display:none}
-/* the glow is a ring outside the pod and the LAST thing painted in it: nothing still sits above a moving layer, so the pod's
-   face, bezel and icon need no layer of their own (measured 11-19: one layer a pod instead of two) */
-body.mk2 .pod .glow{animation:none;opacity:.5;inset:-46%;z-index:1;
+/* the glow is a ring outside the pod, PAINTED with it and still: no layer of its own (will-change off, nothing animating).
+   On the tablet's glass (11-19 night) five glows as layers cost the forge its frames, breathing or not: 96 late of 364
+   against 7 of 501 painted (the old page: 7 of 500). Headless Chromium had counted the same 56 layers and seen nothing.
+   Only a tap lights one, for 0.6 s (mk2Lock): a layer while it plays. */
+body.mk2 .pod .glow{animation:none;will-change:auto;opacity:.5;inset:-46%;z-index:1;
   background:radial-gradient(circle closest-side,rgba(255,181,71,0) 0,rgba(255,181,71,0) 51%,rgba(255,181,71,.4) 55%,rgba(255,181,71,.12) 72%,rgba(255,181,71,0) 96%)}
 body.mk2 .pod.hot .glow{background:radial-gradient(circle closest-side,rgba(255,96,20,0) 0,rgba(255,96,20,0) 51%,rgba(255,96,20,.55) 55%,rgba(255,96,20,.16) 72%,rgba(255,96,20,0) 96%)}
 body.mk2 .pod.idle .glow{opacity:.28}
@@ -919,8 +921,7 @@ function mk2State() {
   const box = mk2Box(); box.innerHTML = '';
   const T = 6000, r0 = g.R * .665, r1 = g.Ro - g.rp - 3, live = S.svc.filter(mk2Live);
   S.svc.forEach((s, i) => {
-    const pod = doc.querySelector(`.pod[data-i="${i}"]`), glow = pod && pod.querySelector('.glow'); if (!glow) return;
-    glow.getAnimations().forEach(a => a.cancel());
+    const pod = doc.querySelector(`.pod[data-i="${i}"]`); if (!pod) return;
     const k = live.indexOf(s);
     pod.classList.toggle('idle', k < 0);
     if (k < 0) return;
@@ -929,7 +930,8 @@ function mk2State() {
     d.animate([{ offset: 0, opacity: 0, transform: `${rot} translateX(${r0.toFixed(1)}px)`, easing: 'cubic-bezier(.35,0,.75,.7)' }, { offset: .02, opacity: 1 },
       { offset: .13, opacity: 1, transform: `${rot} translateX(${r1.toFixed(1)}px)` }, { offset: .15, opacity: 0, transform: `${rot} translateX(${r1.toFixed(1)}px)` },
       { offset: 1, opacity: 0, transform: `${rot} translateX(${r1.toFixed(1)}px)` }], opt);
-    glow.animate([{ offset: 0, opacity: .5 }, { offset: .12, opacity: .5 }, { offset: .16, opacity: 1 }, { offset: .5, opacity: .62 }, { offset: 1, opacity: .5 }], opt);
+    // the pod's glow does NOT peak as its pulse lands any more: a glow that animates is a layer, and on the tablet's glass
+    // five of them cost the forge its frames (11-19 night). The pulse still runs the wire; the glow is painted, still.
   });
 }
 // a tap: the wire fires from the core to the pod, the pod flares, and the two outer rings kick toward it

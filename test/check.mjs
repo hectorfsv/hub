@@ -822,7 +822,10 @@ try {
     if (view === 'tablet') {
       const ls = await layersOf(page), own = (ls || []).filter(n => /mk2-house|mk2-plate|\.m-w|^path|^circle|span\.(orb|ring|face|icon)/.test(n));
       const glows = (ls || []).filter(n => n === 'span.glow').length, pz = (ls || []).filter(n => n === 'i.pz').length;
-      ok(ls && ls.length > 10 && !own.length && glows <= 5 && pz === 4, `at rest the housing, the wires, the belt and the pods' faces keep no layer of their own; one glow a pod, one pulse a live pod (${ls ? ls.length : 'no'} layers, ${glows} glows, ${pz} pulses` + (own.length ? '; theirs: ' + own.join(', ') : '') + ')');
+      ok(ls && ls.length > 10 && !own.length && glows === 0 && pz === 4, `at rest the housing, the wires, the belt, the pods' faces AND their glows keep no layer of their own; one pulse a live pod (${ls ? ls.length : 'no'} layers, ${glows} glows, ${pz} pulses` + (own.length ? '; theirs: ' + own.join(', ') : '') + ')');
+      // the glass, 11-19 night: a glow that is a layer (will-change, or any running animation) costs the forge its frames
+      const gl = await page.$$eval('.pod .glow', g => g.map(e => getComputedStyle(e).willChange + '/' + e.getAnimations().length));
+      ok(gl.length === 5 && gl.every(v => v === 'auto/0'), `no glow asks for a layer: will-change auto and nothing animating (${gl.join(' ')})`);
     }
     checkLayout(await page.evaluate(geometry), view + ' Mark II forge');
     await shot(page, `${view}-mk2-forge`);
