@@ -104,11 +104,11 @@ available, with the HUB, the Lounge and the Pit loaded and Drone Link alive).
 liked everything." So Mark II stays on the tablet (the way back is still there: `./mk2-setup.sh --undo` in
 `projects/desk-tablet/app/`).
 
-**Still to do:** (1) **the Remote pod does not load yet: the stick's address.** He turned the stick on at ~20:40; it came
-up at a NEW address (192.168.1.x changed its last number: the router never had it reserved), answered for about a minute
-(the Mac read its model over adb, its remote server answered), then left the network again before the tablet's Setup
-could be moved. When it is on and stays: `./mk2-setup.sh --stick <its address>` (the tablet's manual, "Hubs 2.24"), then
-the `remote` check. Offered, his go: reserve its address on the router so it never moves again.
+**Still to do:** (1) **the Remote pod does not load yet: the stick must restart once.** The cause (found 11-19 20:55 on the
+router): the router had given the stick an address the air purifier still held, so the stick showed its HUB on the TV
+and nothing could reach it. Fixed at the router on his yes: the stick's old address is reserved for it (the one the
+tablet's Setup holds). It takes it at its next restart; then the Remote loads by itself. The story and the commands: the
+top of `projects/desk-tablet/README.md`.
 (2) **the `remote` check, NOT run: the stick was off the network all evening**
 (no answer at its address from the Mac or the tablet, nothing on the network listening on 8790; the tablet's old front
 door was already showing "Can't reach the HUB yet" before anything was changed), so the Remote pod opens "Can't reach
