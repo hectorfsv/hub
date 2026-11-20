@@ -14,6 +14,62 @@ the Pit, embers rise and the bottom of the screen glows like a firebox.
 - **In any browser,** the pods are plain links.
 - **Samples:** `?demo=cook` shows a pretend brisket; `?demo=night` dims after 4 s; `?boot=0` skips the start-up check.
 
+## Mark II: the main HUB, five pods and a new look (his ask 11-19). ON PREVIEW: `?mk2`, waiting for his eye
+
+**Look at it:** https://hectorfsv.github.io/hub/?mk2&as=tablet (`as=tablet` draws Drone and Remote as the tablet's app
+will; without it a browser draws them unfed and a tap says "OPENS ON THE TABLET"). Samples work with it: `&demo=cook`,
+`&demo=night`, `&boot=0`. Without `?mk2` the page is exactly what it was: the tablet's controller, the TV and the old HUB
+never see any of it (`MK2 = !CTL && ?mk2`, and off when the app says `tv`).
+
+**What it is (his go 11-19 on this concept).** The reactor in the middle; a belt of dark metal round it with his five set
+in it (`MK2_PODS`: Drone and Remote on top, the Lounge and Home on the sides, the Pit at the bottom over the fire); a wire
+from the core to each, under the turning rings; a pulse runs out along the wire of each pod that is up and the pod's glow
+peaks as it lands, one after the other round the ring (6 s a lap); a tap fires the wire, kicks the two outer rings toward
+the pod, then the iris opens from it (`mk2Lock`, 130 ms ahead of the iris). During a cook the Pit's wire, pulse and pod
+run ember. Drone and Remote say what they are (MAVIC AIR, FIRE TV) until the app can give a live reading. Everything else
+is the old page: the clock and its add-ons, the forecast, the cook card, the boot check, night, the holidays.
+
+**The chip (measured 11-19 in the suite's headless Chromium, NOT yet on the tablet's glass):** 56 composited layers, the
+same as the old page, and less painted area (11.2 screens against 13.6). How: the belt, the wires and the pods' faces are
+painted once into layers that already exist (`#orbit`, `#ring-static`); the three orbit runners (each a layer the size
+of the orbit) are not drawn, five small pulses are (`#mk2-pz`, inside the reactor); the pods' dashed rings stand still as
+engraved ticks; a pod's glow is a ring OUTSIDE its face and the last thing painted in it, so nothing still sits above a
+moving layer (one layer a pod, not two). Two traps found: a wire with a CSS transition took a layer of its own and gave
+one to every path drawn after it (no transition on `.m-w`); the pulses under the reactor were hidden by the wire's dark
+channel (they live inside `#reactor`, after `#ring-static`). **Before "put it on": the 10-29 test on the glass
+(61.9 fps, 0 late of ~500), calm and with the forge lit.**
+
+**Tests:** `node test/check.mjs` is 371 checks now (95 for Mark II: four sizes in a browser, the app's taps with the list
+Mark II needs, a cook upright and sideways, the layers, night, a TV untouched); `node test/remote-check.mjs` 473, unchanged.
+
+**Still to do, in order:** (1) his eye on the preview; (2) the tablet's Hubs app (below); (3) the test on the glass; (4) his
+"put it on" (the tablet's Setup gets this page with `?mk2`, or the flag becomes the default off a TV). Offered, his call:
+one still from Dionysus, a forged-metal plate behind everything (the drawn `#bg` is its stand-in).
+
+### His ask, word for word
+
+**His words, 11-19 ~16:10, in order.** To my read ("the tablet opens on the HUB again, with two new pods: Drone opens Drone
+Link and Remote opens the TV remote, next to the Pit, the Lounge and Home (Home Assistant, not set up yet); Drone Link and
+its locks stay exactly as they are"): **"No, you're right. It is exactly that. just one more thing. With this new addition,
+now the hub is not gonna have the streaming services in there. Because the hub, I want it to be like my hub, you know what
+I'm saying? Like the streaming services is gonna be on the hub of my Amazon stick. And the Amazon stick hub comes up when we
+go to remote. So now in the main hub, I want that idea of the design, the interface, but I want you to make it better. Take
+it to the next level. I know it's still this tablet, so you cannot use a lot of chip, but just the design itself. Give me
+something."** Then: "Tell me you need Fable." (he switched this window to Fable 5.2). Then, by voice ("the initials" =
+Dionysus): **"if you need [Dionysus] to build you any motion graphics, any video, any generation of AI to make it look
+cool, let me know."** My answer: stills only (anything that plays redraws every frame and breaks the page's rule); the
+concept names each picture and its price before he makes anything.
+
+**What it means.** The tablet's front door is this page again (since 10-30 it has been the stick's controller,
+its `/hub?ctl` page on :8790; the address is in `projects/desk-tablet/README.md`). Five pods: **Drone / Remote / Home / The Pit / Lounge.** No streaming apps on it:
+those live on the stick's HUB and on the controller, which stay as they are. The TV layout (`tv`) and the controller
+(`?ctl`) are not part of this job.
+
+**What it needs outside this page (found 11-19, not done):** the tablet's Hubs app (2.21) gives the key bridge
+(`HubsApp.press/type/keyState`) only to a HUB view on a :8790 page, and `launch` only opens what its list holds, so Remote
+as a pod and Drone Link as a pod (`com.hectorfsv.dronelink`) both need a small update of the app, and the tablet's Setup
+changes its HUB address (copy its prefs first). Drone Link stays installed with its locks as they are.
+
 ## Around the clock: his picks 10-28
 
 These were on preview (`?try=1`) for an hour. They have been on for everyone since his "Put it on!" that night. Undo:

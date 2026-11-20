@@ -496,6 +496,60 @@ body.land .kp[data-k=lock] .cap{display:none}
 /* a browser asking for less motion gets a still reactor. Not the tablet's app: its "reduce motion" is only Android's
    own animations switched off for speed (10-28), and the HUB's motion is the point (Hector: "make it look the best possible") */
 @media (prefers-reduced-motion:reduce){body:not(.app) .spin,body:not(.app) .halo,body:not(.app) .pulse,body:not(.app) .pod .orb,body:not(.app) .pod .glow{animation:none!important}}
+
+/* ---- Mark II (his ask 11-19: "my hub ... that idea of the design, but make it better. Take it to the next level"): the
+        reactor in the middle, his five docked on its ring, a wire from the core to each. Behind ?mk2 until his "put it on";
+        never a TV or the controller. The chip's rules hold: the plate, the housing, the wires and the dial are painted once
+        into layers that already exist (#bg, #orbit, #ring-static); what moves is one small pulse per live pod (in place of
+        the three orbit runners, whose layers were the size of the orbit) and one glow per pod (the pods' turning dashed
+        rings stand still here, as engraved ticks) ---- */
+body.mk2 #bg{background:
+  radial-gradient(circle at var(--bgX,50%) var(--bgY),transparent 0,transparent calc(var(--Ro) + var(--rp) + 30px),rgba(0,0,0,.4) calc(var(--Ro) + var(--rp) + 190px)),
+  radial-gradient(ellipse 92% 66% at var(--bgX,50%) var(--bgY),#27190F 0%,#160E09 42%,var(--void) 78%)}
+body.mk2 #orbit-c{display:none}
+/* no transition on a wire: a fading SVG path takes a layer of its own, and so does every path drawn after it (measured 11-19) */
+.m-w{fill:none;stroke:#FFB547;opacity:.2}
+body.dim #mk2-house{opacity:.3}
+.m-w.on{opacity:.9}
+.m-w.hot{stroke:#FF7A2A;opacity:1}
+/* a pulse: a small comet, its head leading outward along the wire */
+.pz{position:absolute;left:50%;top:50%;width:30px;height:16px;margin:-8px 0 0 -15px;opacity:0;will-change:transform,opacity;pointer-events:none;
+  background:radial-gradient(circle at 76% 50%,#FFF8E6 0,#FFF8E6 2.6px,rgba(255,190,90,.95) 4.4px,rgba(255,181,71,0) 8px),linear-gradient(90deg,rgba(255,181,71,0) 0,rgba(255,196,107,.6) 70%,rgba(255,181,71,0) 78%) 0 50%/100% 2px no-repeat}
+.pz.hot{background:radial-gradient(circle at 76% 50%,#FFF3DC 0,#FFF3DC 2.6px,rgba(255,112,32,.98) 4.6px,rgba(255,90,20,0) 8.5px),linear-gradient(90deg,rgba(255,106,26,0) 0,rgba(255,140,60,.7) 70%,rgba(255,106,26,0) 78%) 0 50%/100% 2px no-repeat}
+body[data-hol] .pz:nth-child(3n+1){background:radial-gradient(circle at 76% 50%,#fff 0,#fff 2.6px,rgba(var(--h1),.95) 4.4px,rgba(var(--h1),0) 8px)}
+body[data-hol] .pz:nth-child(3n+2){background:radial-gradient(circle at 76% 50%,#fff 0,#fff 2.6px,rgba(var(--h2),.95) 4.4px,rgba(var(--h2),0) 8px)}
+body[data-hol] .pz:nth-child(3n){background:radial-gradient(circle at 76% 50%,#fff 0,#fff 2.6px,rgba(var(--h3),.95) 4.4px,rgba(var(--h3),0) 8px)}
+body.dim.mk2 #mk2-pz{display:none}
+/* the core: glass with a lit upper lip and a shaded floor */
+body.mk2 .core{background:radial-gradient(circle at 50% 28%,#30200F 0%,#190F09 50%,#080504 100%);
+  box-shadow:0 0 0 1px rgba(255,196,107,.6),0 0 calc(var(--R)*.14) rgba(255,181,71,.2),inset 0 0 calc(var(--R)*.16) rgba(255,181,71,.15),
+    inset 0 calc(var(--R)*.022) calc(var(--R)*.03) rgba(255,236,190,.2),inset 0 calc(var(--R)*-.1) calc(var(--R)*.15) rgba(0,0,0,.6)}
+/* the pods: instruments, not buttons. A double bezel, a glass face lit from above, engraved ticks where the dashed ring turned */
+body.mk2 .pod .orb{inset:-13%;animation:none;will-change:auto}
+body.mk2 .pod .orb::before{border:0;background:repeating-conic-gradient(rgba(255,206,130,.62) 0deg,rgba(255,206,130,.62) 1.4deg,transparent 1.4deg,transparent 10deg);
+  -webkit-mask:radial-gradient(circle closest-side,transparent 0,transparent 88.5%,#000 89.5%,#000 97%,transparent 98%);mask:radial-gradient(circle closest-side,transparent 0,transparent 88.5%,#000 89.5%,#000 97%,transparent 98%)}
+body.mk2 .pod .orb::after{display:none}
+/* the glow is a ring outside the pod and the LAST thing painted in it: nothing still sits above a moving layer, so the pod's
+   face, bezel and icon need no layer of their own (measured 11-19: one layer a pod instead of two) */
+body.mk2 .pod .glow{animation:none;opacity:.5;inset:-46%;z-index:1;
+  background:radial-gradient(circle closest-side,rgba(255,181,71,0) 0,rgba(255,181,71,0) 51%,rgba(255,181,71,.4) 55%,rgba(255,181,71,.12) 72%,rgba(255,181,71,0) 96%)}
+body.mk2 .pod.hot .glow{background:radial-gradient(circle closest-side,rgba(255,96,20,0) 0,rgba(255,96,20,0) 51%,rgba(255,96,20,.55) 55%,rgba(255,96,20,.16) 72%,rgba(255,96,20,0) 96%)}
+body.mk2 .pod.idle .glow{opacity:.28}
+body.mk2 .pod.off .glow{opacity:.2}
+body.mk2 .pod .ring{box-shadow:0 0 0 1.6px rgba(255,204,120,.96),0 0 0 4.2px #0B0705,0 0 0 5.2px rgba(255,181,71,.34),0 0 20px rgba(255,181,71,.32),inset 0 0 14px rgba(255,181,71,.24)}
+body.mk2 .pod .face{inset:4px;background:radial-gradient(circle at 50% 20%,#3B2715 0%,#1C120B 46%,#090605 100%);box-shadow:inset 0 2px 2.5px rgba(255,236,190,.22),inset 0 -7px 12px rgba(0,0,0,.62)}
+body.mk2 .pod .face::after{background:radial-gradient(ellipse 72% 44% at 50% 4%,rgba(255,240,205,.2),transparent 72%)}
+body.mk2 .pod.hot .ring{box-shadow:0 0 0 1.6px rgba(255,128,48,.98),0 0 0 4.2px #0B0705,0 0 0 5.2px rgba(255,106,26,.4),0 0 24px rgba(255,96,20,.6),inset 0 0 18px rgba(255,96,20,.4)}
+body.mk2 .pod.hot .face{background:radial-gradient(circle at 50% 108%,#C2410C 0%,#5A1A07 34%,#1A0B06 64%,#0A0708 100%)}
+body.mk2 .pod.hot .orb::before{background:repeating-conic-gradient(rgba(255,140,60,.7) 0deg,rgba(255,140,60,.7) 1.4deg,transparent 1.4deg,transparent 10deg)}
+body.mk2 .pod.hot .meter{inset:-9%}
+body.mk2 .pod .icon{inset:26%}
+body.mk2 .label{width:max-content}
+body.mk2 .label b{font-size:clamp(18px,calc(var(--R)*.125),27px);white-space:nowrap}
+body.mk2 .label span{font-size:10.5px;letter-spacing:.15em}
+body.mk2 .label[data-m=l] b,body.mk2 .label[data-m=l] span{margin-right:0}
+body.mk2 .label[data-m=r] b,body.mk2 .label[data-m=r] span{margin-left:0}
+body.mk2 .chip{white-space:nowrap}
 </style>
 </head>
 <body class="boot">
@@ -550,6 +604,20 @@ const ctlViewport = () => {
 };
 if (CTL) { ctlViewport(); addEventListener('resize', ctlViewport); }
 const DEMO = Q.get('demo') || '';
+// Mark II (his ask 11-19: "my hub ... that idea of the design, but make it better. Take it to the next level"): the reactor
+// in the middle, his five docked on its ring, a wire from the core to each. Behind ?mk2 until his "put it on"; never the
+// controller, never a TV. The angles (0 = right, 90 = down): the Pit at the bottom, over the fire; the top two a little
+// closer than a pentagon's, so their names fit beside them on the tablet.
+// `only`: a pod only the tablet's app can open (an Android app, the stick's remote); a browser draws it and says so on a
+// tap. ?as=tablet draws those two as the tablet will (a sample for judging the look, never a claim).
+const MK2 = !CTL && (Q.has('mk2') || Q.get('try') === 'mk2');
+const MK2_PODS = [
+  { key: 'drone', name: 'Drone', sub: 'MAVIC AIR', icon: 'drone', a: 240, re: /drone/i, app: 'com.hectorfsv.dronelink', only: true },
+  { key: 'remote', name: 'Remote', sub: 'FIRE TV', icon: 'remote', a: 300, re: /:8790\b|remote/i, only: true },
+  { key: 'home', name: 'Home', icon: 'home', a: 15, re: /home|assistant|:8123\b/i },
+  { key: 'pit', name: 'The Pit', icon: 'flame', a: 90, re: /the-pit|\bpit\b|smok/i, url: 'https://hectorfsv.github.io/the-pit/' },
+  { key: 'lounge', name: 'Lounge', icon: 'voice', a: 165, re: /lounge/i, url: 'https://hectorfsv.github.io/lounge/' },
+];
 const doc = document, body = doc.body, $ = id => doc.getElementById(id);
 const MIN = 60e3;
 const PLACE = { lat: 34.3917, lon: -118.5426, name: 'SANTA CLARITA' };   // the point the Lounge's weather uses
@@ -582,6 +650,22 @@ function loadServices() {
   if (APP || CTL && APP0) try { const j = JSON.parse((APP || APP0).services()); list = j.services; S.version = j.version; S.tv = !!j.tv; } catch (e) { /* defaults */ }
   if (CTL) S.tv = true;   // the TV's layout, the TV's pods (the defaults, as on the stick)
   body.classList.toggle('tv', !!S.tv);
+  S.mk2 = MK2 && !S.tv;
+  body.classList.toggle('mk2', S.mk2);
+  if (S.mk2) {   // his five, each matched to the app's own list by its address or its name; a browser gets the public pages
+    const slotOf = re => list ? list.findIndex(s => s && (re.test(String(s.url || '')) || re.test(String(s.name || '')))) : -1;
+    const sample = Q.get('as') === 'tablet';
+    S.svc = MK2_PODS.map((p, i) => {
+      const slot = slotOf(p.re), a = slot >= 0 ? list[slot] : null;
+      const url = a && a.url ? String(a.url) : list ? '' : p.url || '';
+      const app = p.app && APP && APP.launch ? p.app : '';
+      return { i, key: p.key, gone: false, name: p.name, sub: p.sub || '', icon: p.icon, a: p.a, slot: slot >= 0 ? slot : null, url, mic: !!(a && a.mic),
+        app, tab: !!p.only && !url && !app, sample: sample && !!p.only && !url && !app };
+    });
+    S.pitIx = S.svc.findIndex(s => s.key === 'pit' && s.url);
+    $('ver').textContent = 'HUB · MARK II' + (S.version ? ' · APP ' + S.version : '');
+    return;
+  }
   S.svc = [0, 1, 2].map(i => {
     const s = (list && list[i]) || (list ? { name: DEFAULTS[i].name, url: '' } : DEFAULTS[i]);
     const gone = !s.url && (!s.name || CTL && i === 0);   // a slot with no name and no address is not drawn at all; the tablet's Lounge slot stays off the controller
@@ -618,6 +702,9 @@ const ICON = {
   flame: '<svg viewBox="0 0 48 48"><path d="M24 5.5c1.8 6.6 10.5 10.5 10.5 21.5 0 7.6-4.8 13.5-10.5 13.5S13.5 34.6 13.5 28c0-5.4 3-9.4 6-11.6 0 4.6 1.6 7.4 4.3 8.6C22 19.4 22.4 12.2 24 5.5z"/><path d="M24 40.5c-3 0-5.2-2.4-5.2-5.4 0-2.8 1.7-4.6 3.3-5.7.3 2.3 1.4 3.5 3 4-.3-1.8.4-3.9 1.6-5.4 1.7 2 2.5 4.2 2.5 6.9 0 3.4-2.1 5.6-5.2 5.6z" opacity=".75"/></svg>',
   home: '<svg viewBox="0 0 48 48"><path d="M8 23 24 10l16 13M13 19.5V38h22V19.5M21 38v-9h6v9"/></svg>',
   pad: '<svg viewBox="0 0 48 48"><path d="M15.5 15h17c5.4 0 8.6 4.4 9.6 10.6l.9 5.8c.6 3.6-3.6 5.6-6 3.2L32 29.5H16l-5 5.1c-2.4 2.4-6.6.4-6-3.2l.9-5.8C6.9 19.4 10.1 15 15.5 15z"/><path d="M14.5 19.5v6.5M11.25 22.75h6.5"/><circle cx="31" cy="21" r="1.3"/><circle cx="35.5" cy="25" r="1.3"/></svg>',
+  // Mark II: a quadcopter from above, and a remote
+  drone: '<svg viewBox="0 0 48 48"><circle cx="11.5" cy="11.5" r="6.5"/><circle cx="36.5" cy="11.5" r="6.5"/><circle cx="11.5" cy="36.5" r="6.5"/><circle cx="36.5" cy="36.5" r="6.5"/><path d="M16.2 16.2 20 20M31.8 16.2 28 20M16.2 31.8 20 28M31.8 31.8 28 28"/><rect x="19.5" y="19.5" width="9" height="9" rx="2.6"/><path d="M24 23.2v1.6" opacity=".75"/></svg>',
+  remote: '<svg viewBox="0 0 48 48"><rect x="15.5" y="4.5" width="17" height="39" rx="6.5"/><circle cx="24" cy="16" r="5"/><circle cx="24" cy="16" r="1.1"/><path d="M20.5 28.5h.01M27.5 28.5h.01M20.5 35h.01M27.5 35h.01" stroke-width="2.8"/></svg>',
 };
 // a TV's games: RetroArch leaves the apps ring and is a pod of its own, between the Pit and Home Assistant (his 11-03; the controller 11-04)
 const GAMES = ['com.retroarch.ra32', 'com.retroarch', 'com.retroarch.aarch64'];
@@ -659,6 +746,18 @@ function layout(force) {
     Ro = R * 1.82; rp = R * .25; Ra = R * 1.3; ra = R * .15;
     cx = land ? R * 2.07 + 30 : W / 2; cy = land ? Math.max(30 + R * 1.9, (H - R * 3.97 - 30) / 2 + R * 1.9) : 100 + R * 1.9;
     ang = [220, 270, 320]; labelSide = true;
+  } else if (S.mk2) {   // Mark II: the reactor in the middle, his five on its ring; the top two read beside them (or above, on a narrow phone), the rest below
+    const k = .171, topH = land ? 58 : 92, botH = land ? 20 : 16 + 126, labelH = land ? 52 : 74;
+    const half = o => Math.max(.966 * o + k * o + 18, .5 * o + k * o + 12 + 84 + 10);   // sideways: half the machine's width, its side labels included
+    Ro = Math.min((H - topH - botH - 14 - 12 - labelH - 10) / (1.866 + 2 * k), land ? 300 : (W / 2 - 18) / (.966 + k), 300);
+    if (land) while (2 * half(Ro) + 20 + 190 + 22 > W && Ro > 60) Ro *= .97;
+    const above = !land && W / 2 - .5 * Ro - k * Ro - 21 < 78;   // no room beside the top pods: their names go above them
+    if (above) Ro = Math.min(Ro, (H - topH - botH - 14 - 12 - labelH - 10 - 50) / (1.866 + 2 * k));
+    rp = Ro * k; R = Ro - rp - 6;   // the pods dock just outside the reactor's own ring, on the belt
+    cx = land ? half(Ro) : W / 2;
+    const lo = topH + 14 + (above ? 50 : 0) + rp + .866 * Ro, hi = H - botH - 10 - labelH - 12 - rp - Ro;
+    cy = hi > lo ? (lo + hi) / 2 : lo;
+    ang = [0, 0, 0]; labelSide = false; S.above = above;
   } else if (!land) {
     const topH = 92, botH = 16 + 126, labelH = 74;
     R = Math.min(W * .36, (H - topH - 12 - 12 - labelH - 10 - botH) / 2.77, 250);
@@ -685,6 +784,10 @@ function layout(force) {
   if (land) { st.setProperty('--colL', (cx + R * .9) + 'px'); st.setProperty('--colW', Math.max(170, W - (cx + Ro + rp + 200)) + 'px'); }
   if (land && S.tv) { st.setProperty('--tvL', (cx + Ro + rp + 16 + 210 + 18).toFixed(1) + 'px'); st.setProperty('--pT', '104px'); }
   if (CTL) { st.setProperty('--tvL', (land ? cx + Ro + rp + 44 : 22).toFixed(1) + 'px'); st.setProperty('--pT', Math.round(land ? 108 : cy + Ro + rp + 40) + 'px'); }
+  if (S.mk2) {
+    st.setProperty('--Ro', Ro.toFixed(1) + 'px'); st.setProperty('--bgX', (cx / W * 100).toFixed(1) + '%');
+    if (land) { st.setProperty('--colL', cx + 'px'); st.setProperty('--colW', Math.max(170, W - 22 - 20 - 2 * cx) + 'px'); }
+  }
   const r = $('reactor'); Object.assign(r.style, { left: cx - R + 'px', top: cy - R + 'px', width: 2 * R + 'px', height: 2 * R + 'px' });
   const o = $('orbit'); Object.assign(o.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
   o.setAttribute('viewBox', `${-Ro} ${-Ro} ${2 * Ro} ${2 * Ro}`);
@@ -693,12 +796,14 @@ function layout(force) {
   const g = $('og'); if (land) { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 1); g.setAttribute('y2', 0); } else { g.setAttribute('x1', 0); g.setAttribute('y1', 0); g.setAttribute('x2', 0); g.setAttribute('y2', 1); }
   const rn = $('runners'); Object.assign(rn.style, { left: cx - Ro + 'px', top: cy - Ro + 'px', width: 2 * Ro + 'px', height: 2 * Ro + 'px' });
   const vis = S.svc.filter(s => !s.gone).sort((a, b) => (a.pos ?? a.i) - (b.pos ?? b.i)).map(s => s.i);   // the pods drawn, spread evenly on the same arc
-  const at = vis.length === 3 ? (CTL ? [230, 270, 310] : ang) : vis.length === 2 ? [(ang[0] + ang[1]) / 2, (ang[1] + ang[2]) / 2] : [ang[1]];   // the controller's three: Games on top, clear of ON and VOL +
+  const at = S.mk2 ? vis.map(i => S.svc[i].a) : vis.length === 3 ? (CTL ? [230, 270, 310] : ang) : vis.length === 2 ? [(ang[0] + ang[1]) / 2, (ang[1] + ang[2]) / 2] : [ang[1]];   // the controller's three: Games on top, clear of ON and VOL +
   S.geo.pods = [];
   vis.forEach((i, k) => { S.geo.pods[i] = { x: cx + Ro * Math.cos(at[k] * Math.PI / 180), y: cy + Ro * Math.sin(at[k] * Math.PI / 180) }; });
+  if (S.mk2) mk2Draw();
   doc.querySelectorAll('.pod').forEach(p => {
     const i = +p.dataset.i, c = S.geo.pods[i];
     Object.assign(p.style, { left: c.x - rp + 'px', top: c.y - rp + 'px', width: 2 * rp + 'px', height: 2 * rp + 'px' });
+    if (S.mk2) return;   // Mark II places its labels itself (mk2Labels, from fitLabels)
     const l = $('label' + i); l.classList.toggle('side', labelSide);
     if (labelSide) Object.assign(l.style, { left: c.x + rp + 16 + 'px', top: c.y - 26 + 'px', width: '210px', transformOrigin: '0 50%' });
     else Object.assign(l.style, { left: c.x - 110 + 'px', top: c.y + rp + 12 + 'px', width: '220px', transformOrigin: '50% 0' });
@@ -711,6 +816,7 @@ function layout(force) {
 // a long name near an edge slides inward rather than off the screen
 function fitLabels() {
   if (!S.geo) return;
+  if (S.mk2) { mk2Labels(); return; }
   if (CTL) {   // the controller: a pod's label outside it, the left one to its left
     doc.querySelectorAll('.label').forEach(l => {
       const c = S.geo.pods[+l.id.slice(5)]; if (!c) return;
@@ -733,6 +839,7 @@ function fitLabels() {
 // energy on the orbit: each runner circles the reactor and shows only along the arc that holds the pods
 function runners() {
   const box = $('runners'); box.innerHTML = '';
+  if (S.mk2) { S.live = null; mk2State(); return; }   // Mark II: pulses down the wires, not lights round the orbit
   const land = S.geo.land;
   // rotation 0deg = the top of the orbit; the pods sit near 180deg (portrait) or 90deg (landscape)
   [[11000, 1, 0], [17000, -1, .45], [26000, 1, .7]].forEach(([ms, dir, ph]) => {
@@ -744,6 +851,98 @@ function runners() {
   });
 }
 
+// ---- Mark II: the housing, the wires, the pulses (his ask 11-19). Painted once into layers that already exist: the
+//      housing and the wires into the reactor's static ring (under the turning rings, so they read as deeper), the dial
+//      into the orbit's SVG. What moves: one small pulse per live pod, out along its wire, and that pod's glow, which
+//      peaks as the pulse lands. The three orbit runners (each a layer the size of the orbit) and the pods' turning
+//      dashed rings are not drawn here ----
+const rad = d => d * Math.PI / 180;
+function mk2Draw() {
+  const g = S.geo, u = 100 / g.R, re = (g.Ro - g.rp) * u + 1.2;
+  // the wires: in the reactor's static ring, so the turning rings pass over them. A dark channel, the gold line in it, a collar at the core
+  let wires = '';
+  S.svc.forEach((s, i) => {
+    const d = s.a + 90, [x0, y0] = P(63.4, d), [x1, y1] = P(re, d), [ax, ay] = P(66.8, d - 2.6), [bx, by] = P(66.8, d + 2.6);
+    wires += `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="#050302" stroke-width="3.8" opacity=".92"/>`
+      + `<path d="M${x0} ${y0}L${x1} ${y1}" class="m-w" id="mk2-w${i}" stroke-width=".9"/>`
+      + `<path d="M${ax} ${ay}L${bx} ${by}" stroke="#FFD27A" stroke-width="1.1" opacity=".8"/>`;
+  });
+  const old = $('mk2-house'); if (old) old.remove();
+  $('ring-static').insertAdjacentHTML('afterbegin', `<g id="mk2-house" fill="none">${wires}</g>`);
+  // the belt: the ring of dark metal the pods are set in, lit from above; fine ticks engraved in it between the pods
+  const w = g.rp * .52, span = Math.asin(g.rp * 1.2 / g.Ro) * 180 / Math.PI, xy = (r, a) => `${(r * Math.cos(rad(a))).toFixed(1)} ${(r * Math.sin(rad(a))).toFixed(1)}`;
+  let t1 = '', studs = '';
+  for (let a = 0; a < 360; a += 3) {
+    if (S.svc.some(s => Math.abs(((a - s.a) % 360 + 540) % 360 - 180) < span)) continue;
+    t1 += `M${xy(g.Ro - 3, a)}L${xy(g.Ro + 3, a)}`;
+  }
+  const as = S.svc.map(s => s.a).sort((a, b) => a - b);
+  as.forEach((a, k) => { const b = as[(k + 1) % as.length] + (k + 1 === as.length ? 360 : 0), [x, y] = xy(g.Ro, (a + b) / 2).split(' '); studs += `<circle cx="${x}" cy="${y}" r="2.6"/>`; });
+  const op = $('mk2-plate'); if (op) op.remove();
+  $('orbit').insertAdjacentHTML('beforeend', '<g id="mk2-plate" fill="none"><defs><linearGradient id="m-belt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34220F"/><stop offset=".22" stop-color="#1B120B"/><stop offset=".7" stop-color="#100A07"/><stop offset="1" stop-color="#0A0605"/></linearGradient></defs>'
+    + `<circle r="${g.Ro.toFixed(1)}" stroke="#000" stroke-width="${(2 * w + 8).toFixed(1)}" opacity=".34"/>`
+    + `<circle r="${g.Ro.toFixed(1)}" stroke="url(#m-belt)" stroke-width="${(2 * w).toFixed(1)}"/>`
+    + `<circle r="${(g.Ro - w).toFixed(1)}" stroke="#FFC46B" stroke-width="1" opacity=".5"/><circle r="${(g.Ro + w).toFixed(1)}" stroke="#FFC46B" stroke-width="1" opacity=".32"/>`
+    + `<path d="M${xy(g.Ro + w, 205)}A${(g.Ro + w).toFixed(1)} ${(g.Ro + w).toFixed(1)} 0 0 1 ${xy(g.Ro + w, 335)}" stroke="#FFE9B0" stroke-width="1.2" opacity=".5"/>`
+    + `<path d="${t1}" stroke="#FFB547" stroke-width="1" opacity=".3"/><g fill="#080504" stroke="#C8923A" stroke-width=".8">${studs}</g></g>`);
+}
+// a pod's name and state: beside the top two (or above them on a narrow phone), below the rest; never off the screen
+function mk2Labels() {
+  const g = S.geo, W = innerWidth;
+  doc.querySelectorAll('.label').forEach(l => {
+    const i = +l.id.slice(5), c = g.pods[i], s = S.svc[i]; if (!c || !s) return;
+    const m = s.a <= 180 ? 'b' : S.above ? 'a' : c.x < g.cx ? 'l' : 'r';
+    if (l.dataset.m !== m) l.dataset.m = m;
+    const w = l.offsetWidth, h = l.offsetHeight;
+    const x = m === 'l' ? c.x - g.rp - 13 - w : m === 'r' ? c.x + g.rp + 13 : clamp(c.x - w / 2, 8, W - 8 - w);
+    const y = m === 'b' ? c.y + g.rp + 11 : m === 'a' ? c.y - g.rp - 9 - h : c.y - h / 2;
+    Object.assign(l.style, { left: x.toFixed(1) + 'px', top: y.toFixed(1) + 'px', transformOrigin: m === 'l' ? '100% 50%' : m === 'r' ? '0 50%' : m === 'a' ? '50% 100%' : '50% 0' });
+  });
+}
+// the pulses' own box: inside the reactor, over the wires and under the turning rings
+function mk2Box() {
+  let b = $('mk2-pz');
+  if (!b) { $('ring-static').insertAdjacentHTML('afterend', '<div id="mk2-pz" aria-hidden="true"></div>'); b = $('mk2-pz'); }
+  return b;
+}
+// which pods the core feeds: a page that answers, an app the tablet can open, the Pit while a cook runs
+const mk2Live = (s, i) => !!(s.app || s.sample || s.url && (s.key === 'remote' || S.reach[i] === 'on' || i === S.pitIx && S.cook));
+function mk2State() {
+  const g = S.geo; if (!g || !$('mk2-house')) return;
+  const hotAt = S.cook ? S.pitIx : -1;
+  S.svc.forEach((s, i) => { const w = $('mk2-w' + i), cls = 'm-w' + (mk2Live(s, i) ? ' on' : '') + (i === hotAt ? ' hot' : ''); if (w && w.getAttribute('class') !== cls) w.setAttribute('class', cls); });
+  const sig = S.svc.map((s, i) => (mk2Live(s, i) ? 1 : 0) + (i === hotAt ? 'h' : '')).join('');
+  if (sig === S.live) return;   // only a change restarts the pulses: the Pit's poll comes every minute
+  S.live = sig;
+  const box = mk2Box(); box.innerHTML = '';
+  const T = 6000, r0 = g.R * .665, r1 = g.Ro - g.rp - 3, live = S.svc.filter(mk2Live);
+  S.svc.forEach((s, i) => {
+    const pod = doc.querySelector(`.pod[data-i="${i}"]`), glow = pod && pod.querySelector('.glow'); if (!glow) return;
+    glow.getAnimations().forEach(a => a.cancel());
+    const k = live.indexOf(s);
+    pod.classList.toggle('idle', k < 0);
+    if (k < 0) return;
+    const d = doc.createElement('i'), rot = `rotate(${s.a}deg)`, opt = { duration: T, iterations: Infinity, delay: -T * (1 - k / live.length) };
+    d.className = 'pz' + (i === hotAt ? ' hot' : ''); box.appendChild(d);
+    d.animate([{ offset: 0, opacity: 0, transform: `${rot} translateX(${r0.toFixed(1)}px)`, easing: 'cubic-bezier(.35,0,.75,.7)' }, { offset: .02, opacity: 1 },
+      { offset: .13, opacity: 1, transform: `${rot} translateX(${r1.toFixed(1)}px)` }, { offset: .15, opacity: 0, transform: `${rot} translateX(${r1.toFixed(1)}px)` },
+      { offset: 1, opacity: 0, transform: `${rot} translateX(${r1.toFixed(1)}px)` }], opt);
+    glow.animate([{ offset: 0, opacity: .5 }, { offset: .12, opacity: .5 }, { offset: .16, opacity: 1 }, { offset: .5, opacity: .62 }, { offset: 1, opacity: .5 }], opt);
+  });
+}
+// a tap: the wire fires from the core to the pod, the pod flares, and the two outer rings kick toward it
+function mk2Lock(i) {
+  const g = S.geo, s = S.svc[i], pod = doc.querySelector(`.pod[data-i="${i}"]`); if (!pod || !g || !s) return;
+  const rot = `rotate(${s.a}deg)`, d = doc.createElement('i'), side = Math.cos(rad(s.a)) >= 0 ? 1 : -1;
+  pod.querySelector('.glow').animate([{ opacity: 1 }, { opacity: 1, offset: .35 }, { opacity: .55 }], { duration: 620, easing: 'ease-out' });
+  d.className = 'pz shot'; mk2Box().appendChild(d);
+  d.animate([{ opacity: 1, transform: `${rot} translateX(${(g.R * .665).toFixed(1)}px)` }, { opacity: 1, transform: `${rot} translateX(${(g.Ro - g.rp - 3).toFixed(1)}px)` }],
+    { duration: 170, easing: 'cubic-bezier(.3,0,.6,1)' }).onfinish = () => d.remove();
+  const kick = (id, from) => $(id).animate([{ transform: `rotate(${from}deg)` }, { transform: 'rotate(0)' }], { duration: 700, easing: 'cubic-bezier(.15,.85,.25,1)' });
+  kick('up-seg', -34 * side); kick('up-ticks', 18 * side);
+  S.locks = (S.locks || 0) + 1;
+}
+
 // ---- the pods ----
 function buildPods() {
   const box = $('pods'); box.innerHTML = '';
@@ -752,9 +951,9 @@ function buildPods() {
     if (s.gone) return;
     const p = doc.createElement('div');
     p.dataset.i = i;
-    p.className = 'pod' + (s.url || s.app ? '' : ' off') + (i === S.pitIx ? ' pit' : '') + (s.app ? ' games' : '');
-    p.setAttribute('role', 'button'); p.setAttribute('tabindex', s.url || s.app ? '0' : '-1'); p.setAttribute('aria-label', s.name);
-    const icon = s.app ? ICON.pad : i === S.pitIx || /pit|smok|bbq/i.test(s.name) ? ICON.flame : /home|assistant|house/i.test(s.name) ? ICON.home : ICON.voice;
+    p.className = 'pod' + (s.url || s.app || s.tab ? '' : ' off') + (i === S.pitIx ? ' pit' : '') + (s.app && !s.key ? ' games' : '');
+    p.setAttribute('role', 'button'); p.setAttribute('tabindex', s.url || s.app || s.tab ? '0' : '-1'); p.setAttribute('aria-label', s.name);
+    const icon = s.icon ? ICON[s.icon] : s.app ? ICON.pad : i === S.pitIx || /pit|smok|bbq/i.test(s.name) ? ICON.flame : /home|assistant|house/i.test(s.name) ? ICON.home : ICON.voice;
     p.innerHTML = `<span class="glow"></span><span class="orb"></span><span class="meter"><svg viewBox="-50 -50 100 100"><circle r="47" stroke="rgba(255,120,40,.18)"/><circle r="47" stroke="#FF8A3A" id="meter${i}" stroke-dasharray="0 400"/></svg></span><span class="ring"></span><span class="face"></span><span class="icon">${icon}</span>`;
     box.appendChild(p);
     const l = doc.createElement('div'); l.className = 'label'; l.id = 'label' + i;
@@ -788,7 +987,8 @@ function renderPods() {
     const st = $('st' + i), st2 = $('st2_' + i), pod = doc.querySelector(`.pod[data-i="${i}"]`);
     if (!st || !pod) return;
     let a, b = '', hot = false;
-    if (s.app) a = '<em class="ok">●</em> RETROARCH';
+    if (s.key && (s.app || s.tab || s.key === 'remote' && s.url)) a = s.sub;   // Mark II's Drone and Remote say what they are; a live reading takes this line when the app can give one
+    else if (s.app) a = '<em class="ok">●</em> RETROARCH';
     else if (!s.url) a = 'NOT SET UP';
     else if (S.reach[i] === 'off') a = '<em class="bad">● OFFLINE</em>';
     else if (i === S.pitIx && S.cook) {
@@ -819,6 +1019,7 @@ function renderPods() {
     }
   });
   fitLabels();
+  if (S.mk2) mk2State();
 }
 const deg = v => v == null ? '—' : Math.round(v) + '°';
 
@@ -831,19 +1032,22 @@ function irisScale(c) {
 function irisAt(c) { const e = $('iris'); e.style.left = c.x + 'px'; e.style.top = c.y + 'px'; return e; }
 function launch(i) {
   const s = S.svc[i];
+  if (s && s.tab) { mk2Lock(i); toast((s.key === 'drone' ? 'DRONE LINK' : 'THE REMOTE') + ' OPENS ON THE TABLET'); return; }
   if (!s || !s.url && !s.app) { toast((s ? s.name.toUpperCase() : 'THAT') + ' IS NOT SET UP YET'); return; }
   if (CTL && s.app) { launchApp(s.app); return; }   // the controller stays here: Games opens on the TV, no iris (as the crown's apps)
   if (S.launching) return;
   S.launching = true; wake();
+  const lead = S.mk2 ? 130 : 0;   // Mark II: the wire fires and the rings kick first, then the pod opens
+  if (S.mk2) mk2Lock(i);
   const c = S.geo.pods[i], { s0, s1 } = irisScale(c), e = irisAt(c);
   e.getAnimations().forEach(a => a.cancel());
   e.animate([{ transform: `scale(${s0})`, opacity: 0 }, { transform: `scale(${s0 * 1.3})`, opacity: 1, offset: .12 }, { transform: `scale(${s1})`, opacity: 1 }],
-    { duration: 380, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
+    { duration: 380, delay: lead, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   setTimeout(() => {
     if (s.app) launchApp(s.app);
-    else if (APP || CTL && APP0) (APP || APP0).open(i);   // the controller too: a pod opens on the tablet in his hand (his 10-30), never on the TV
+    else if (APP || CTL && APP0) (APP || APP0).open(s.slot != null ? s.slot : i);   // the controller too: a pod opens on the tablet in his hand (his 10-30), never on the TV
     else if (CTL) CT.hub({ do: 'open', i }); else location.assign(s.url);
-  }, 230);
+  }, 230 + lead);
   setTimeout(() => {   // still here (the app said no, or a browser stayed): open the room again
     S.launching = false;
     if (!doc.hidden) e.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
@@ -925,7 +1129,7 @@ function isNight() {
 
 // ---- is each service answering? (a HEAD to its page: no n8n, nothing paid) ----
 async function reach(i) {
-  const s = S.svc[i]; if (!s.url) return 'unset';
+  const s = S.svc[i]; if (!s.url || s.key === 'remote') return 'unset';   // the stick's remote is a plain-http page on his network: this page cannot ask it
   if (DEMO) return 'on';
   try {
     const same = new URL(s.url).origin === location.origin;
@@ -1140,7 +1344,8 @@ async function boot() {
   const log = $('boot-log'), line = $('boot-line');
   const skip = Q.get('boot') === '0';
   const checks = checkAll(), wx = weather(true);
-  const rows = [['ARC CORE', Promise.resolve('ok')]].concat(S.svc.filter(s => !s.gone).map(s => [s.name.toUpperCase(), s.url ? checks.then(r => r[s.i] === 'on' ? 'ok' : 'bad') : Promise.resolve(s.app ? 'ok' : 'unset')]),
+  // Mark II's Drone and Remote have no check of their own yet: not listed
+  const rows = [['ARC CORE', Promise.resolve('ok')]].concat(S.svc.filter(s => !s.gone && !(s.key && (s.tab || s.app || s.key === 'remote'))).map(s => [s.name.toUpperCase(), s.url ? checks.then(r => r[s.i] === 'on' ? 'ok' : 'bad') : Promise.resolve(s.app ? 'ok' : 'unset')]),
     [['WEATHER', wx.then(() => S.wx && !S.wxErr ? 'ok' : 'bad')]]);
   const label = { ok: '<b class="ok">ONLINE</b>', bad: '<b class="bad">NO ANSWER</b>', unset: '<b class="wait">NOT SET UP</b>' };
   const pad = s => (s + ' ').padEnd(17, '·') + ' ';
@@ -1167,7 +1372,7 @@ function finishBoot() {
   body.classList.add('landing'); body.classList.remove('boot');
   const up = (id, from) => $(id).animate([{ transform: `rotate(${from}deg)` }, { transform: 'rotate(0)' }], { duration: 1700, easing: 'cubic-bezier(.15,.85,.25,1)' });
   up('up-seg', 300); up('up-ticks', -160);
-  doc.querySelectorAll('.pod,.label').forEach((e, k) => { e.style.transitionDelay = (420 + (k % 3) * 110) + 'ms'; });
+  doc.querySelectorAll('.pod,.label').forEach((e, k) => { e.style.transitionDelay = (S.mk2 ? 380 + +(e.dataset.i || e.id.slice(5)) * 85 : 420 + (k % 3) * 110) + 'ms'; });   // Mark II: round the ring, one after the other
   setTimeout(() => { doc.querySelectorAll('.pod,.label').forEach(e => { e.style.transitionDelay = ''; }); body.classList.remove('landing'); b.remove(); }, 1600);
   renderPods();
 }
@@ -1345,7 +1550,7 @@ function renderDay() {
   bead.style.display = pos ? '' : 'none';
   if (!pos) return;
   const ph = moonPhase(now), key = pos.kind === 'sun' ? 'sun' : 'moon' + Math.round(ph * 60);
-  const [x, y] = P(S.geo && S.geo.land ? 95.5 : 99, pos.a);   // on the outer ring; landscape's pods sit closer, so a little inside
+  const [x, y] = P(S.mk2 ? 94.6 : S.geo && S.geo.land ? 95.5 : 99, pos.a);   // on the outer ring; landscape's pods sit closer, so a little inside (Mark II's dock on the housing)
   bead.setAttribute('transform', `translate(${x} ${y}) scale(.667)`);
   if (key !== S.beadKey) { S.beadKey = key; bead.innerHTML = pos.kind === 'sun' ? sunSvg() : moonSvg(ph); bead.dataset.kind = pos.kind; }
 }
@@ -1475,6 +1680,7 @@ window.hub = {
   refresh() { loadServices(); buildPods(); layout(true); checkAll(); pitPoll(); },
   state() {
     const o = { booted: S.booted, dimmed: S.dimmed, forge: body.classList.contains('forge'), pit: S.pit, reach: S.reach, svc: S.svc.map(s => s.name), geo: S.geo, sheet: S.sheet, wx: !!(S.wx && S.wx.j), night: isNight() };
+    Object.assign(o, { mk2: !!S.mk2, live: S.live || '', locks: S.locks || 0, above: !!S.above });
     Object.assign(o, { bat: S.bat, air: S.air ? S.air.aqi : null, day: dayPos(Date.now()), bead: $('bead').dataset.kind || '', tmr: S.tmr, alarm: !!S.alarm, flares: S.flares || 0, sparks: S.sparks || 0, hol: body.dataset.hol || '' });
     return JSON.stringify(o);
   },

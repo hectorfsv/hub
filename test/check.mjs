@@ -47,7 +47,7 @@ let failures = 0;
 const ok = (cond, what) => { if (cond) console.log('  ok  ', what); else { failures++; console.log('  FAIL', what); } };
 
 const browser = await chromium.launch({ executablePath: SHELL });
-async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null, tv = false, apps = [] } = {}) {
+async function open(view, { app = false, linked = false, cooking = false, query = '', at = AT, battery = null, tv = false, apps = [], services = null } = {}) {
   const ctx = await browser.newContext(Object.assign({ timezoneId: 'America/Los_Angeles' }, VIEWS[view]));
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date(at) });
@@ -65,7 +65,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (u.includes('/rest/v1/readings')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(pit.reading || READING) });
     return r.fulfill({ status: 404, body: '' });
   });
-  await page.addInitScript(([app, linked, bat, tv, apps]) => {
+  await page.addInitScript(([app, linked, bat, tv, apps, svc]) => {
     // the battery: a stand-in the test can plug in and out; every read is counted
     window.__batCalls = 0;
     const real = navigator.getBattery && navigator.getBattery.bind(navigator);
@@ -78,7 +78,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
     if (app) {
       window.__calls = [];
       window.HubsApp = {
-        services: () => JSON.stringify({ version: '2.0', tv, services: [
+        services: () => JSON.stringify({ version: '2.0', tv, services: svc || [
           tv ? { name: '', url: '', mic: false } : { name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true },   // the stick: the Lounge out (10-30)
           { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
           { name: 'Home Assistant', url: '', mic: false }] }),
@@ -93,7 +93,7 @@ async function open(view, { app = false, linked = false, cooking = false, query 
         },
       };
     }
-  }, [app, linked, battery, tv, apps]);
+  }, [app, linked, battery, tv, apps, services]);
   if (tv) {   // a TV fetches the Lounge's feeds and plays YouTube: fakes, and a story's page answers 204 so the HUB stays put
     const rss = items => `<?xml version="1.0"?><rss><channel>${items.map(([t, h]) => `<item><title>${t}</title><link>https://news.test/${encodeURIComponent(t)}</link><pubDate>${new Date(T0 - h * 3600e3).toUTCString()}</pubDate></item>`).join('')}</channel></rss>`;
     const FEED = { 'moxie.foxnews.com/google-publisher/world.xml': rss([['Israel and Hamas talks resume in Cairo', 1], ['Typhoon nears the Philippines', .5]]),
@@ -134,7 +134,7 @@ function checkLayout(g, name) {
   const hits = [];
   for (let a = 0; a < g.items.length; a++) for (let b = a + 1; b < g.items.length; b++) {
     const [na, ra] = g.items[a], [nb, rb] = g.items[b];
-    if ((na === 'pod0' && nb === 'label0') || (na === 'pod1' && nb === 'label1') || (na === 'pod2' && nb === 'label2') || (na === 'bottom' && nb === 'foot')) continue;
+    if ((/^pod\d$/.test(na) && nb === 'label' + na.slice(3)) || (na === 'bottom' && nb === 'foot')) continue;
     const ix = Math.min(ra.r, rb.r) - Math.max(ra.x, rb.x), iy = Math.min(ra.b, rb.b) - Math.max(ra.y, rb.y);
     if (ix > 1 && iy > 1) hits.push(`${na}×${nb}`);
   }
@@ -701,6 +701,105 @@ try {
     await page.waitForTimeout(800);
     await page.keyboard.press('ArrowDown');
     ok(!(await page.$('.cur')), 'the tablet, no TV: the arrows ring nothing');
+    await ctx.close();
+  }
+
+  // Mark II (his ask 11-19: "my hub ... that idea of the design, but make it better"), behind ?mk2: the reactor in the
+  // middle, his five on its ring, a wire from the core to each; no streaming apps; never a TV
+  const FIVE = ['Drone', 'Remote', 'Home', 'The Pit', 'Lounge'];
+  const NEXT = [{ name: 'Lounge', url: 'https://hectorfsv.github.io/lounge/', mic: true }, { name: 'The Pit', url: 'https://hectorfsv.github.io/the-pit/', mic: false },
+    { name: 'Home Assistant', url: '', mic: false }, { name: 'Remote', url: 'http://stick.test:8790/hub?ctl&k=test', mic: false }];   // the app's list as Mark II needs it
+  for (const view of ['tablet', 'tablet-land', 'iphone', 'desktop']) {
+    console.log(`\n${view}: Mark II, a browser`);
+    const { ctx, page, errors } = await open(view, { query: 'mk2' });
+    await page.waitForFunction(() => !document.getElementById('boot'), null, { timeout: 8000 });
+    await page.waitForTimeout(1900);
+    const st = await state(page), g = st.geo;
+    ok(st.mk2 && st.booted && st.wx, 'Mark II is on, booted, the weather read');
+    ok(JSON.stringify(st.svc) === JSON.stringify(FIVE) && (await page.$$eval('.pod', p => p.length)) === 5, `his five pods, in the ring's order (${st.svc.join(', ')})`);
+    ok(!(await page.$('.tapp')) && !(await page.isVisible('#apps')), 'no streaming apps on it');
+    ok(g.pods.every(p => Math.abs(Math.hypot(p.x - g.cx, p.y - g.cy) - g.Ro) < .5) && Math.abs(g.pods[3].x - g.cx) < .5 && g.pods[3].y > g.cy, 'all five on one ring round the clock, the Pit at the bottom');
+    ok(st.reach[3] === 'on' && st.reach[4] === 'on' && st.reach[2] === 'unset', 'the Pit and the Lounge checked, Home not set up');
+    ok(await page.isVisible('#chip3'), "the Pit offers 'LINK LIVE COOKS'");
+    ok((await page.textContent('#st0')) === 'MAVIC AIR' && (await page.textContent('#st1')) === 'FIRE TV', 'the Drone and the Remote say what they are');
+    ok(st.live === '00011' && (await page.$$eval('#mk2-pz .pz', z => z.length)) === 2, `a pulse runs only to what answers (${st.live})`);
+    ok((await page.$$eval('.m-w', w => w.map(e => e.classList.contains('on')).join())) === 'false,false,false,true,true', 'those two wires are lit, the others dark');
+    ok(!(await page.$('#runners .runner')) && await page.$$eval('.pod .orb', o => o.every(e => getComputedStyle(e).animationName === 'none')), "no orbit runners, and the pods' rings stand still");
+    ok(!!st.bead && st.air === 70 && !!(await page.$('#gauges path')), 'the add-ons stay: the bead, the air, the brackets');
+    const b = await page.locator('.pod[data-i="0"]').boundingBox();
+    if (VIEWS[view].hasTouch) await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); else await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);   // the desktop has a mouse
+    await page.waitForTimeout(450);
+    ok(/DRONE LINK OPENS ON THE TABLET/.test(await page.textContent('#toast')) && (await state(page)).locks === 1, 'a browser: a tap on Drone fires its wire and says it opens on the tablet');
+    checkLayout(await page.evaluate(geometry), view + ' Mark II');
+    await shot(page, `${view}-mk2`);
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntablet: Mark II in the app, taps');
+    const { ctx, page, errors } = await open('tablet', { app: true, services: NEXT, query: 'mk2&boot=0' });
+    await page.waitForTimeout(1500);
+    const tapAt = async i => { const b = await page.locator(`.pod[data-i="${i}"]`).boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(650); };
+    const calls = () => page.evaluate(() => window.__calls);
+    const back = async i => { await page.evaluate(k => window.hub.returned(k), i); await page.waitForTimeout(900); };
+    ok((await state(page)).live === '11011' && (await page.$$eval('#mk2-pz .pz', z => z.length)) === 4, 'the core feeds four: Drone, Remote, the Pit, the Lounge (Home is not set up)');
+    await tapAt(0);
+    ok((await calls()).includes('launch:com.hectorfsv.dronelink'), 'Drone asks the app to open Drone Link');
+    await back(0); await tapAt(1);
+    ok((await calls()).includes('open:3'), "Remote asks the app for the remote's own slot (3)");
+    await back(1); await tapAt(4);
+    ok((await calls()).includes('open:0'), 'the Lounge opens slot 0');
+    await back(4); await tapAt(3);
+    ok((await calls()).includes('open:1'), 'the Pit opens slot 1');
+    await back(3); const n = (await calls()).length; await tapAt(2);
+    ok((await calls()).length === n && /HOME IS NOT SET UP YET/.test(await page.textContent('#toast')), 'Home (not set up) opens nothing and says so');
+    ok((await state(page)).locks === 4, 'each of the four taps fired its wire and kicked the rings');
+    ok(await page.isVisible('#gear'), 'the gear shows in the app');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  for (const view of ['tablet', 'tablet-land']) {
+    console.log(`\n${view}: Mark II, a cook`);
+    const { ctx, page, errors } = await open(view, { app: true, services: NEXT, linked: true, cooking: true, query: 'mk2&boot=0' });
+    await page.waitForFunction(() => document.body.classList.contains('forge'), null, { timeout: 6000 });
+    await page.waitForTimeout(2600);
+    const st = await state(page);
+    ok(st.forge && st.live === '1101h1', `the forge is lit and the Pit's wire runs hot (${st.live})`);
+    ok(await page.$eval('.pod.pit', p => p.classList.contains('hot')) && await page.$eval('#mk2-w3', w => w.classList.contains('hot')) && (await page.$$eval('#mk2-pz .pz.hot', z => z.length)) === 1, 'the Pit pod burns, its wire and its pulse are ember');
+    ok(/251°/.test(await page.textContent('#st3')) && /168°/.test(await page.textContent('#st2_3')) && (await page.$$eval('#embers .ember', e => e.length)) === 28, 'the Pit pod shows pit 251° and brisket 168°; 28 embers');
+    const kept = await page.evaluate(() => { document.querySelector('#mk2-pz .pz').dataset.keep = '1'; window.hub.renderPods(); return document.querySelector('#mk2-pz .pz').dataset.keep === '1'; });
+    ok(kept, 'a poll with nothing new restarts no pulse');
+    if (view === 'tablet') {
+      const ls = await layersOf(page), own = (ls || []).filter(n => /mk2-house|mk2-plate|\.m-w|^path|^circle|span\.(orb|ring|face|icon)/.test(n));
+      const glows = (ls || []).filter(n => n === 'span.glow').length, pz = (ls || []).filter(n => n === 'i.pz').length;
+      ok(ls && ls.length > 10 && !own.length && glows <= 5 && pz === 4, `at rest the housing, the wires, the belt and the pods' faces keep no layer of their own; one glow a pod, one pulse a live pod (${ls ? ls.length : 'no'} layers, ${glows} glows, ${pz} pulses` + (own.length ? '; theirs: ' + own.join(', ') : '') + ')');
+    }
+    checkLayout(await page.evaluate(geometry), view + ' Mark II forge');
+    await shot(page, `${view}-mk2-forge`);
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntablet: Mark II at night');
+    const { ctx, page, errors } = await open('tablet', { app: true, services: NEXT, query: 'mk2&boot=0&demo=night' });
+    await page.waitForFunction(() => document.body.classList.contains('dim'), null, { timeout: 12000 });
+    await page.waitForTimeout(2600);
+    ok((await page.evaluate(() => window.__calls)).includes('dim:true') && !(await page.isVisible('#mk2-pz')), 'dims, asks the app to dim the screen, and the pulses stop');
+    await shot(page, 'tablet-mk2-night');
+    const b = await page.locator('.pod[data-i="4"]').boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(600);
+    const calls = await page.evaluate(() => window.__calls);
+    ok(calls.includes('dim:false') && !calls.includes('open:0') && await page.isVisible('#mk2-pz'), 'the first touch wakes it and opens nothing; the pulses run again');
+    ok(!errors.length, errs(errors));
+    await ctx.close();
+  }
+  {
+    console.log('\ntv: ?mk2 changes nothing on a TV');
+    const { ctx, page, errors } = await open('tv', { app: true, tv: true, apps: [{ name: 'Netflix', pkg: 'com.netflix.ninja', icon: '' }], query: 'mk2&boot=0' });
+    await page.waitForTimeout(1500);
+    const st = await state(page);
+    ok(!st.mk2 && !(await page.evaluate(() => document.body.classList.contains('mk2'))) && (await page.$$eval('.tapp', a => a.length)) === 1 && !(await page.$('#mk2-house')), "a TV keeps its own HUB: its apps ring, none of Mark II's parts");
+    ok(!errors.length, errs(errors));
     await ctx.close();
   }
 } finally {
