@@ -14,7 +14,7 @@ the Pit, embers rise and the bottom of the screen glows like a firebox.
 - **In any browser,** the pods are plain links.
 - **Samples:** `?demo=cook` shows a pretend brisket; `?demo=night` dims after 4 s; `?boot=0` skips the start-up check.
 
-## Mark II: the main HUB, five pods and a new look (his ask 11-19). ON PREVIEW: `?mk2`; he liked it (11-19 17:05)
+## Mark II: the main HUB, five pods and a new look (his ask 11-19). ON THE TABLET since 11-19 19:58 (its Setup holds `?mk2`), AND IT STAYS: his verdict on the tablet, 20:40
 
 **Look at it:** https://hectorfsv.github.io/hub/?mk2&as=tablet (`as=tablet` draws Drone and Remote as the tablet's app
 will; without it a browser draws them unfed and a tap says "OPENS ON THE TABLET"). Samples work with it: `&demo=cook`,
@@ -23,34 +23,61 @@ never see any of it (`MK2 = !CTL && ?mk2`, and off when the app says `tv`).
 
 **What it is (his go 11-19 on this concept).** The reactor in the middle; a belt of dark metal round it with his five set
 in it (`MK2_PODS`: Drone and Remote on top, the Lounge and Home on the sides, the Pit at the bottom over the fire); a wire
-from the core to each, under the turning rings; a pulse runs out along the wire of each pod that is up and the pod's glow
-peaks as it lands, one after the other round the ring (6 s a lap); a tap fires the wire, kicks the two outer rings toward
+from the core to each, under the turning rings; a pulse runs out along the wire of each pod that is up, one after the
+other round the ring (6 s a lap; **the pod's glow no longer peaks as it lands: see "The chip"**); a tap fires the wire, lights the pod for 0.6 s, kicks the two outer rings toward
 the pod, then the iris opens from it (`mk2Lock`, 130 ms ahead of the iris). During a cook the Pit's wire, pulse and pod
 run ember. Drone and Remote say what they are (MAVIC AIR, FIRE TV) until the app can give a live reading. Everything else
 is the old page: the clock and its add-ons, the forecast, the cook card, the boot check, night, the holidays.
 
-**The chip (measured 11-19 in the suite's headless Chromium, NOT yet on the tablet's glass):** 56 composited layers, the
-same as the old page, and less painted area (11.2 screens against 13.6). How: the belt, the wires and the pods' faces are
-painted once into layers that already exist (`#orbit`, `#ring-static`); the three orbit runners (each a layer the size
-of the orbit) are not drawn, five small pulses are (`#mk2-pz`, inside the reactor); the pods' dashed rings stand still as
-engraved ticks; a pod's glow is a ring OUTSIDE its face and the last thing painted in it, so nothing still sits above a
-moving layer (one layer a pod, not two). Two traps found: a wire with a CSS transition took a layer of its own and gave
-one to every path drawn after it (no transition on `.m-w`); the pulses under the reactor were hidden by the wire's dark
-channel (they live inside `#reactor`, after `#ring-static`). **Before "put it on": the 10-29 test on the glass
-(61.9 fps, 0 late of ~500), calm and with the forge lit.**
+**The chip, measured ON THE TABLET'S GLASS 11-19 night** (`dumpsys SurfaceFlinger --latency`, ~500 frames a line; "late" =
+a frame over 25 ms). The page as pushed that afternoon FAILED with the forge lit, and headless Chromium had not seen it:
 
-**Tests:** `node test/check.mjs` is 384 checks now (108 for Mark II: four sizes in a browser, the app's taps with the list
+| on the glass, same minutes | calm | forge lit |
+|---|---|---|
+| the old page (no `?mk2`), night | 61.7 fps, 2 late of 499 | 61.0 fps, 7 of 500 |
+| Mark II as pushed 17:00, night | 58–61 fps, 4–20 of ~500 | **48.8–56.1 fps, 52–129 of ~500** |
+| Mark II as pushed 17:00, day | 61.4 fps, 3 of 375 | 55.2 fps, 43 of 377 |
+| **Mark II now (hub `12a2724`), day** | **61.9 fps, 0 of 499** | **61.7 fps, 2 of 500** |
+| **Mark II now, night** | **61.9 fps, 0 of 500** | **61.7 fps, 2 of 500** |
+
+**The cause, found by switching off one part at a time on the glass with the forge lit:** the pods' GLOWS. Each was a
+small layer of its own (217 px), and five of them cost the frames whether they breathed or stood still (96 late
+breathing, 97 still, 82 with `will-change` off but the animation running); with the glows gone 12 late, with the pods
+gone 3. Pulses off, belt and wires off, embers off: no difference worth a line. **The fix:** the glow is painted with its
+pod and still (`will-change:auto`, no running animation), so it is no layer; it no longer peaks as its pulse lands; only
+a tap lights it, for 0.6 s (a layer while it plays). The suite refuses a glow that asks for a layer.
+
+**What headless Chromium said, and why it is not the judge:** 56 composited layers, the same as the old page, and less
+painted area (11.2 screens against 13.6). True, and the tablet still dropped a quarter of its frames. A layer count
+equal to the old page's proves nothing about this GPU: **measure every change to what moves on the glass, calm AND with
+the forge lit, day AND night** (after sunset the page dims itself a minute after the last touch; the two looks are
+different loads). How the afternoon got to 56: the belt, the wires and the pods' faces are painted once into layers that
+already exist (`#orbit`, `#ring-static`); the three orbit runners (each a layer the size of the orbit) are not drawn,
+five small pulses are (`#mk2-pz`, inside the reactor); the pods' dashed rings stand still as engraved ticks. Two traps
+found then: a wire with a CSS transition took a layer of its own and gave one to every path drawn after it (no
+transition on `.m-w`); the pulses under the reactor were hidden by the wire's dark channel (they live inside `#reactor`,
+after `#ring-static`).
+
+**Traps of measuring on the glass (11-19):** a page loaded into the HUB's view from another address (the Mac's working
+copy through `adb reverse`) measured 45 fps calm, far worse than the same code from Pages minutes later (61.9): an
+artifact of pointing the view across sites, not the page; test real code by pushing it (the revert is one push) or
+emulate the change on the live page over CDP. Port 8765 on the Mac belongs to another server of his: check a port is free
+before serving. The on-tablet checks must touch an empty spot first when the page is dimmed (`awake`), or their tap only
+wakes it.
+
+**Tests:** `node test/check.mjs` is 385 checks now (109 for Mark II: four sizes in a browser, the app's taps with the list
 Mark II needs and the way back as the app really does it (its slot, a hidden page, no word after an Android app), Drone
 Link not opening, a cook upright and sideways, the layers, night, a TV untouched); `node test/remote-check.mjs` 487 (14 new:
-the controller as a service of the main HUB). Both all passed 11-19 19:35.
+the controller as a service of the main HUB). Both all passed 11-19 (the controller's 19:35, the HUB's 20:20 with the glow fix).
 
 **His verdict, 11-19 ~17:05, after opening it on his phone: "I opened it on my phone, i liked it!"**
 
-**The tablet's app, 11-19 evening: Hubs 2.24 is BUILT on the Mac, NOT installed** (the tablet is still on 2.21 and still
-the remote). What it does and why: `projects/desk-tablet/README.md`, "Hubs 2.24" (a fourth slot for the Remote, the key
-bridge on that slot's page, Drone Link's cockpit on the tablet's own launch list, a no said to the page).
+**The tablet's app: Hubs 2.24, INSTALLED 11-19 19:58 on his "Go!"** (the tablet's Setup switched to the five the same
+minute by `mk2-setup.sh --on`; the Setup before it is kept on the tablet for `--undo`). What it does and why:
+`projects/desk-tablet/README.md`, "Hubs 2.24" (a fourth slot for the Remote, the key bridge on that slot's page, Drone
+Link's cockpit on the tablet's own launch list, a no said to the page).
 
-**The page's side of it (same evening, in the working copy, NOT pushed):**
+**The page's side of it (hub `37e8cf6`, pushed 11-19 19:50 on his go):**
 - **Coming back lands on the right pod.** The app says which of ITS slots closed (`hub.returned(slot)`: 0 Lounge, 1 the
   Pit, 3 Remote) and Mark II's five have their own order, so the slot now finds its pod. Before, back from the Pit closed
   the iris on the Remote (the suite had been calling `returned` with the pod's number, so it never saw it).
@@ -67,19 +94,27 @@ bridge on that slot's page, Drone Link's cockpit on the tablet's own launch list
   near-black until the page reloads; probed 11-19 in headless Chromium, the story in `research/history/hub.md`). The fix
   is one condition in `launch` (`track` also when `S.tv` and the pod is an app) plus a check.
 
-**Still to do, in order:** (1) his go for the tablet: push these page changes, install 2.24, copy the tablet's prefs, give
-Setup the five (the HUB page with `?mk2`, the Lounge's address back, the Remote = today's front door, moved on the tablet
-itself); (2) the on-tablet checks `five remote drone` and the test on the glass (`smooth`); (3) his "put it on" (it stays),
-or the prefs go back and it waits.
+**Done on his "Go!" (11-19 19:45–20:30), proven on the tablet** (`device-check.mjs`): `five` (real taps open the Remote,
+slot 3, and the Pit, slot 1; Home comes back; the iris closes on the right pod), `drone` (a real tap on the Drone pod opens
+Drone Link's cockpit, Back returns with the iris closed; an app off the list does not open and the page is told),
+`smooth` (61.9 fps, 0 late of 375; forge 61.1 fps, 5 of 375), `memory` (Hubs 212 MB + renderer 128 MB; 961 MB of 1.8 GB
+available, with the HUB, the Lounge and the Pit loaded and Drone Link alive).
 
-**On his go (moved word for word from NOW.md, 11-19; he liked the look, 17:05; asked 11-19 19:36):** Hubs 2.24 is BUILT on
-the Mac (Drone and Remote as real pods) and the page's fixes are in the working copy, NOT pushed; both suites pass (384 and
-487). The tablet is NOT touched: asleep by his power button, still on 2.21, still the remote. On it, in order: commit and
-push `projects/hub`; wake the tablet; `ANDROID_SERIAL=<its USB serial> ./build.sh --install`; `./mk2-setup.sh --on`;
-`ANDROID_SERIAL=<its USB serial> node test/device-check.mjs five remote drone smooth memory`; then his "put it on", or
-`./mk2-setup.sh --undo`. (The build, the Setup script and the device checks are in `projects/desk-tablet/app/`; its
-manual, "Hubs 2.24", has the serial: this repo is public.) Offered, his call: one still from Dionysus, a forged-metal plate behind everything (the
-drawn `#bg` is its stand-in).
+**His verdict on the tablet, 11-19 20:40, word for word:** "I open everything . So far it looks good ." and "And yeah, I
+liked everything." So Mark II stays on the tablet (the way back is still there: `./mk2-setup.sh --undo` in
+`projects/desk-tablet/app/`).
+
+**Still to do:** (1) **the Remote pod does not load yet: the stick's address.** He turned the stick on at ~20:40; it came
+up at a NEW address (192.168.1.x changed its last number: the router never had it reserved), answered for about a minute
+(the Mac read its model over adb, its remote server answered), then left the network again before the tablet's Setup
+could be moved. When it is on and stays: `./mk2-setup.sh --stick <its address>` (the tablet's manual, "Hubs 2.24"), then
+the `remote` check. Offered, his go: reserve its address on the router so it never moves again.
+(2) **the `remote` check, NOT run: the stick was off the network all evening**
+(no answer at its address from the Mac or the tablet, nothing on the network listening on 8790; the tablet's old front
+door was already showing "Can't reach the HUB yet" before anything was changed), so the Remote pod opens "Can't reach
+Remote yet" and tries again by itself until the stick is back; then `ANDROID_SERIAL=<its USB serial> node
+test/device-check.mjs remote` (it sends no key to the TV); (3) his call: the TV's black HUB after a game ("Found, NOT fixed", above), one
+still from Dionysus (a forged-metal plate behind everything; the drawn `#bg` is its stand-in).
 
 **Before touching the tablet (moved word for word from NOW.md, 11-19):** The tablet is shared with the drone and is still
 on the remote: leave Drone Link installed and its locks as they are (voice take off LOCKED, the bench test OFF); ask him
