@@ -104,16 +104,13 @@ available, with the HUB, the Lounge and the Pit loaded and Drone Link alive).
 liked everything." So Mark II stays on the tablet (the way back is still there: `./mk2-setup.sh --undo` in
 `projects/desk-tablet/app/`).
 
-**Still to do:** (1) **the Remote pod does not load yet: the stick must restart once.** The cause (found 11-19 20:55 on the
-router): the router had given the stick an address the air purifier still held, so the stick showed its HUB on the TV
-and nothing could reach it. Fixed at the router on his yes: the stick's old address is reserved for it (the one the
-tablet's Setup holds). It takes it at its next restart; then the Remote loads by itself. The story and the commands: the
-top of `projects/desk-tablet/README.md`.
-(2) **the `remote` check, NOT run: the stick was off the network all evening**
-(no answer at its address from the Mac or the tablet, nothing on the network listening on 8790; the tablet's old front
-door was already showing "Can't reach the HUB yet" before anything was changed), so the Remote pod opens "Can't reach
-Remote yet" and tries again by itself until the stick is back; then `ANDROID_SERIAL=<its USB serial> node
-test/device-check.mjs remote` (it sends no key to the TV); (3) his call: the TV's black HUB after a game ("Found, NOT fixed", above), one
+**The Remote pod works end to end (11-19 21:28).** It had not loaded all evening because the router had given the stick
+an address the air purifier still held; fixed at the router on his yes (the stick's own address reserved), he restarted
+the stick, and then: the `remote` check passed, and one RIGHT and one LEFT sent the way the Remote sends them moved the
+TV's ring from Netflix to The Pit and back (read on the stick). The story: the top of `projects/desk-tablet/README.md`.
+
+**Still to do:** (1) owed, the tablet's app: a load that hangs is never retried (the tablet's manual, same place);
+(2) nothing else on Mark II itself; (3) his call: the TV's black HUB after a game ("Found, NOT fixed", above), one
 still from Dionysus (a forged-metal plate behind everything; the drawn `#bg` is its stand-in).
 
 **Before touching the tablet (moved word for word from NOW.md, 11-19):** The tablet is shared with the drone and is still
